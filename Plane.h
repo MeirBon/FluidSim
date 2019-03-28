@@ -17,7 +17,7 @@ struct Plane
 	vec3 forward;
 	vec2 size;
 
-	GLuint VBO, VAO;
+	GLuint VBOV, VBON, VAO;
 
 	explicit Plane(vec3 pos, vec3 r, vec3 f, vec2 dims);
 	void draw(Shader &shader) const;

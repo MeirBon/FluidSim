@@ -2,6 +2,7 @@
 
 #include <GLFW/glfw3.h>
 #include <iostream>
+#include <tuple>
 
 #include "Camera.h"
 #include "Plane.h"
@@ -9,11 +10,14 @@
 #include "Simulator.h"
 #include "Timer.h"
 
+#define TINYOBJLOADER_IMPLEMENTATION
+#include "tiny_obj_loader.h"
+
 using namespace glm;
 
 static bool *keys;
 static double lastX, lastY;
-static Camera camera = Camera(vec3(8.0f, 10.0f, 30.0f));
+static Camera camera = Camera(vec3(8.0f, 25.0f, 30.0f));
 
 static bool runSim = false;
 
@@ -63,7 +67,8 @@ int main(int argc, char *argv[])
 	keys = new bool[512];
 	memset(keys, 0, 512 * sizeof(bool));
 
-	auto *shader = new Shader("shaders/plane.vert", "shaders/plane.frag");
+	auto *shader = new Shader("shaders/sphere.vert", "shaders/sphere.frag");
+	auto *planeShader = new Shader("shaders/plane.vert", "shaders/plane.frag");
 
 	SimulationParams simulationParams;
 	simulationParams.particleRadius = 1.0f;
@@ -78,7 +83,15 @@ int main(int argc, char *argv[])
 	const auto pid = simulator.addParams(simulationParams);
 	simulator.addParticles(PARTICLE_COUNT, pid);
 	simulator.addPlane(
-		Plane(vec3(0.0f, 0.0f, 0.0f), vec3(1.0f, 0.0f, 0.0f), vec3(0.0f, 0.0f, 1.0f), vec2(100.0f, 100.0f)));
+		Plane(vec3(0.0f, 0.0f, 0.0f), vec3(1.0f, 0.0f, 0.0f), vec3(0.0f, 0.0f, 1.0f), vec2(21.0f, 21.0f)));
+	simulator.addPlane(
+		Plane(vec3(-20.0f, 0.0f, 0.0f), vec3(0.0f, 0.0f, 1.0f), vec3(0.0f, 1.0f, 0.0f), vec2(20.0f, 15.0f)));
+	simulator.addPlane(
+		Plane(vec3(20.0f, 0.0f, 0.0f), vec3(0.0f, 0.0f, -1.0f), vec3(0.0f, 1.0f, 0.0f), vec2(20.0f, 15.0f)));
+	simulator.addPlane(
+		Plane(vec3(0.0f, 0.0f, -20.0f), vec3(-1.0f, 0.0f, 0.0f), vec3(0.0f, 1.0f, 0.0f), vec2(20.0f, 15.0f)));
+	simulator.addPlane(
+		Plane(vec3(0.0f, 0.0f, 20.0f), vec3(1.0f, 0.0f, 0.0f), vec3(0.0f, 1.0f, 0.0f), vec2(20.0f, 15.0f)));
 
 	const auto &particles = simulator.getParticles();
 	std::vector<vec3> positions;
@@ -91,22 +104,93 @@ int main(int argc, char *argv[])
 	glEnable(GL_VERTEX_PROGRAM_POINT_SIZE);
 	glEnable(GL_DEPTH_TEST);
 
-	GLuint positionBuffer, VAO;
+	std::string warn, err;
+	tinyobj::attrib_t attrib;
+	std::vector<tinyobj::shape_t> shapes;
+	std::vector<tinyobj::material_t> materials;
+	bool ret = tinyobj::LoadObj(&attrib, &shapes, &materials, &err, "Models/sphere.obj");
 
+	if (!err.empty())
+		std::cout << "Model error: " << err << std::endl, exit(1);
+	if (!ret)
+		exit(1);
+
+	std::vector<vec3> vertices, normals;
+	for (auto &s : shapes)
+	{
+		int index_offset = 0;
+		for (unsigned int f = 0; f < s.mesh.num_face_vertices.size(); f++)
+		{
+			int fv = s.mesh.num_face_vertices[f];
+			for (int v = 0; v < fv; v++)
+			{
+				const auto &idx = s.mesh.indices[index_offset + v];
+				const auto &vx = attrib.vertices[3 * idx.vertex_index + 0];
+				const auto &vy = attrib.vertices[3 * idx.vertex_index + 1];
+				const auto &vz = attrib.vertices[3 * idx.vertex_index + 2];
+				if (!attrib.normals.empty())
+				{
+					const auto &nx = attrib.normals[3 * idx.normal_index + 0];
+					const auto &ny = attrib.normals[3 * idx.normal_index + 1];
+					const auto &nz = attrib.normals[3 * idx.normal_index + 2];
+
+					normals.emplace_back(nx, ny, nz);
+				}
+
+				const vec3 vertex = vec3(vx, vy, vz);
+
+				vertices.push_back(glm::normalize(vertex));
+			}
+
+			index_offset += fv;
+		}
+	}
+
+	GLuint sphereBuffers[2], sphereVAO;
+	glGenBuffers(2, sphereBuffers);
+	glBindBuffer(GL_ARRAY_BUFFER, sphereBuffers[0]);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(vec3) * vertices.size(), vertices.data(), GL_STATIC_DRAW);
+	glBindBuffer(GL_ARRAY_BUFFER, sphereBuffers[1]);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(vec3) * normals.size(), normals.data(), GL_STATIC_DRAW);
+	glGenVertexArrays(1, &sphereVAO);
+	glBindVertexArray(sphereVAO);
+	glEnableVertexAttribArray(0);
+	glBindBuffer(GL_ARRAY_BUFFER, sphereBuffers[0]);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (void *)0);
+	glEnableVertexAttribArray(1);
+	glBindBuffer(GL_ARRAY_BUFFER, sphereBuffers[1]);
+	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, (void *)0);
+
+	glBindVertexArray(0);
+	glDisableVertexAttribArray(0);
+	glDisableVertexAttribArray(1);
+
+	/*GLuint positionBuffer, VAO;
 	glGenVertexArrays(1, &VAO);
 	glBindVertexArray(VAO);
-
 	glGenBuffers(1, &positionBuffer);
 	glBindBuffer(GL_ARRAY_BUFFER, positionBuffer);
 	glBufferData(GL_ARRAY_BUFFER, sizeof(glm::vec3) * positions.size(), positions.data(), GL_DYNAMIC_DRAW);
 	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (void *)0);
-	glEnableVertexAttribArray(0);
+	glEnableVertexAttribArray(0);*/
 
 	shader->enable();
 	shader->setUniformMatrix4fv("view", glm::mat4(1.0f));
 	shader->setUniformMatrix4fv("projection", glm::mat4(1.0f));
 	shader->setUniformMatrix4fv("model", glm::mat4(1.0f));
+	shader->setUniform3f("lightIntensity", vec3(1.0f));
+	shader->setUniform3f("lightDirection", glm::normalize(vec3(-1.0f, 1.0f, 0.0f)));
+	shader->setUniform3f("ambient", vec3(0.1f));
 	shader->disable();
+
+	planeShader->enable();
+	planeShader->setUniformMatrix4fv("view", glm::mat4(1.0f));
+	planeShader->setUniformMatrix4fv("projection", glm::mat4(1.0f));
+	planeShader->setUniformMatrix4fv("model", glm::mat4(1.0f));
+	planeShader->setUniform3f("lightIntensity", vec3(1.0f));
+	planeShader->setUniform3f("lightDirection", glm::normalize(vec3(-1.0f, -1.0f, 0.0f)));
+	planeShader->setUniform3f("ambient", vec3(0.1f));
+	planeShader->disable();
 
 	timer.reset();
 	float elapsed = 0.1f, elapsedSum = 0.0f;
@@ -123,12 +207,12 @@ int main(int argc, char *argv[])
 			positions.push_back(p.position);
 		}
 
-		glBindVertexArray(VAO);
+		/*glBindVertexArray(VAO);
 		glBufferData(GL_ARRAY_BUFFER, sizeof(glm::vec3) * positions.size(), positions.data(), GL_DYNAMIC_DRAW);
-		CHECKGL();
+		CHECKGL();*/
 
-		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (void *)0);
-		CHECKGL();
+		/*glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (void *)0);
+		CHECKGL();*/
 
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
@@ -138,17 +222,28 @@ int main(int argc, char *argv[])
 
 		shader->setUniformMatrix4fv("view", camera.GetViewMatrix());
 		shader->setUniformMatrix4fv("projection", camera.GetProjectionMatrix(SCRWIDTH, SCRHEIGHT, 0.1f, 1e34f));
-		shader->setUniformMatrix4fv("model", glm::mat4(1.0f));
-		shader->setUniform1f("radius", 4.f);
+		shader->setUniform1f("radius", simulationParams.particleRadius);
 		shader->setUniform3f("color", vec3(1.0f, 0.0f, 0.0f));
 
-		glDrawArrays(GL_POINTS, 0, GLsizei(positions.size()));
+		glBindVertexArray(sphereVAO);
+		for (const auto &position : positions)
+		{
+			shader->setUniform3f("position", position);
+			glDrawArrays(GL_TRIANGLES, 0, vertices.size());
+			CHECKGL();
+		}
+
+		// glDrawArrays(GL_POINTS, 0, GLsizei(positions.size()));
 		CHECKGL();
 		glBindVertexArray(0);
 
+		planeShader->enable();
+		planeShader->setUniformMatrix4fv("view", camera.GetViewMatrix());
+		planeShader->setUniformMatrix4fv("projection", camera.GetProjectionMatrix(SCRWIDTH, SCRHEIGHT, 0.1f, 1e34f));
+
 		for (const auto &plane : simulator.getPlanes())
 		{
-			plane.draw(*shader);
+			plane.draw(*planeShader);
 			CHECKGL();
 		}
 
@@ -188,6 +283,8 @@ int main(int argc, char *argv[])
 		timer.reset();
 	}
 
+	delete shader;
+	delete planeShader;
 	delete[] keys;
 	return 0;
 }

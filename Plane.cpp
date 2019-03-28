@@ -4,34 +4,52 @@ using namespace glm;
 
 Plane::Plane(vec3 pos, vec3 r, vec3 f, vec2 dims) : position(pos), right(r), forward(f), size(dims)
 {
-	std::vector<vec3> positions;
-	const vec3 offsetRight = r * (dims.x / 2.0f);
-	const vec3 offsetForward = f * (dims.y / 2.0f);
+	std::vector<vec3> vertices;
+	std::vector<vec3> normals;
+	const vec3 offsetRight = r * dims.x;
+	const vec3 offsetForward = f * dims.y;
+	const vec3 normal = glm::normalize(glm::cross(f, r));
 
-	positions.push_back(pos - offsetRight - offsetForward);
-	positions.push_back(pos + offsetRight - offsetForward);
-	positions.push_back(pos - offsetRight + offsetForward);
-	positions.push_back(pos + offsetRight - offsetForward);
-	positions.push_back(pos - offsetRight + offsetForward);
-	positions.push_back(pos + offsetRight + offsetForward);
+	vertices.push_back(pos - offsetRight - offsetForward);
+	vertices.push_back(pos + offsetRight - offsetForward);
+	vertices.push_back(pos - offsetRight + offsetForward);
+	vertices.push_back(pos + offsetRight - offsetForward);
+	vertices.push_back(pos - offsetRight + offsetForward);
+	vertices.push_back(pos + offsetRight + offsetForward);
+
+	for (int i = 0; i < 6; i++)
+		normals.push_back(normal);
+
+	// Load data onto GPU
+	glGenBuffers(1, &VBOV);
+	glBindBuffer(GL_ARRAY_BUFFER, VBOV);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(glm::vec3) * vertices.size(), vertices.data(), GL_STATIC_DRAW);
+	glGenBuffers(1, &VBON);
+	glBindBuffer(GL_ARRAY_BUFFER, VBON);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(glm::vec3) * normals.size(), normals.data(), GL_STATIC_DRAW);
 
 	glGenVertexArrays(1, &VAO);
 	glBindVertexArray(VAO);
 
-	glGenBuffers(1, &VBO);
-	glBindBuffer(GL_ARRAY_BUFFER, VBO);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(glm::vec3) * positions.size(), positions.data(), GL_STATIC_DRAW);
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (void *)0);
-	glBindBuffer(GL_ARRAY_BUFFER, 0);
 	glEnableVertexAttribArray(0);
+	glBindBuffer(GL_ARRAY_BUFFER, VBOV);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (void *)0); // Vertices
+
+	glEnableVertexAttribArray(1);
+	glBindBuffer(GL_ARRAY_BUFFER, VBON);
+	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, (void *)0); // Normals
+
+	glBindVertexArray(0);
+	glDisableVertexAttribArray(0);
+	glDisableVertexAttribArray(1);
 }
 
 void Plane::draw(Shader &shader) const
 {
 	shader.enable();
-	shader.setUniform1f("radius", 1.0f);
-	shader.setUniform3f("color", vec3(0.0f, 1.0f, 0.0f));
+	shader.setUniform3f("color", vec3(0.9f));
 	glBindVertexArray(VAO);
 	glDrawArrays(GL_TRIANGLES, 0, 6);
 	glBindVertexArray(0);
+	shader.disable();
 }
