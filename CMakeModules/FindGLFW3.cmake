@@ -1,49 +1,102 @@
-# Locate the glfw3 library
+##=============================================================================
+##
+##  Copyright (c) Kitware, Inc.
+##  All rights reserved.
+##  See LICENSE.txt for details.
+##
+##  This software is distributed WITHOUT ANY WARRANTY; without even
+##  the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR
+##  PURPOSE.  See the above copyright notice for more information.
+##
+##  Copyright 2016 Sandia Corporation.
+##  Copyright 2016 UT-Battelle, LLC.
+##  Copyright 2016 Los Alamos National Security.
+##
+##  Under the terms of Contract DE-AC04-94AL85000 with Sandia Corporation,
+##  the U.S. Government retains certain rights in this software.
+##  Under the terms of Contract DE-AC52-06NA25396 with Los Alamos National
+##  Laboratory (LANL), the U.S. Government retains certain rights in
+##  this software.
+##
+##=============================================================================
+# Try to find EGL library and include dir.
+# Once done this will define
 #
-# This module defines the following variables:
+# GLFW_FOUND
+# GLFW_INCLUDE_DIR
+# GLFW_LIBRARY
 #
-# GLFW3_LIBRARY the name of the library;
-# GLFW3_INCLUDE_DIR where to find glfw include files.
-# GLFW3_FOUND true if both the GLFW3_LIBRARY and GLFW3_INCLUDE_DIR have been found.
-#
-# To help locate the library and include file, you can define a
-# variable called GLFW3_ROOT which points to the root of the glfw library
-# installation.
-#
-# default search dirs
-#
-# Cmake file from: https://github.com/daw42/glslcookbook
 
-set(_glfw3_HEADER_SEARCH_DIRS
-        "/usr/include"
-        "/usr/local/include"
-        "${CMAKE_SOURCE_DIR}/includes"
-        "C:/Program Files (x86)/glfw/include")
-set(_glfw3_LIB_SEARCH_DIRS
-        "/usr/lib"
-        "/usr/local/lib"
-        "${CMAKE_SOURCE_DIR}/lib"
-        "C:/Program Files (x86)/glfw/lib-msvc110")
+include(FindPackageHandleStandardArgs)
 
-# Check environment for root search directory
-set(_glfw3_ENV_ROOT $ENV{GLFW3_ROOT})
-if (NOT GLFW3_ROOT AND _glfw3_ENV_ROOT)
-    set(GLFW3_ROOT ${_glfw3_ENV_ROOT})
+if (WIN32)
+    find_path( GLFW_INCLUDE_DIR
+            NAMES
+            GLFW/glfw3.h
+            PATHS
+            ${PROJECT_SOURCE_DIR}/shared_external/glfw/include
+            ${PROJECT_SOURCE_DIR}/../shared_external/glfw/include
+            ${GLFW_LOCATION}/include
+            $ENV{GLFW_LOCATION}/include
+            $ENV{PROGRAMFILES}/GLFW/include
+            ${GLFW_LOCATION}
+            $ENV{GLFW_LOCATION}
+            DOC "The directory where GLFW/glfw3.h resides" )
+    if(ARCH STREQUAL "x86")
+        find_library( GLFW_LIBRARY
+                NAMES
+                glfw3
+                PATHS
+                ${GLFW_LOCATION}/lib
+                $ENV{GLFW_LOCATION}/lib
+                $ENV{PROGRAMFILES}/GLFW/lib
+                DOC "The GLFW library")
+    else()
+        find_library( GLFW_LIBRARY
+                NAMES
+                glfw3
+                PATHS
+                ${GLFW_LOCATION}/lib
+                $ENV{GLFW_LOCATION}/lib
+                $ENV{PROGRAMFILES}/GLFW/lib
+                DOC "The GLFW library")
+    endif()
 endif ()
 
-# Put user specified location at beginning of search
-if (GLFW3_ROOT)
-    list(INSERT _glfw3_HEADER_SEARCH_DIRS 0 "${GLFW3_ROOT}/include")
-    list(INSERT _glfw3_LIB_SEARCH_DIRS 0 "${GLFW3_ROOT}/lib")
+if (${CMAKE_HOST_UNIX})
+    find_path( GLFW_INCLUDE_DIR
+            NAMES
+            GLFW/glfw3.h
+            PATHS
+            ${GLFW_LOCATION}/include
+            $ENV{GLFW_LOCATION}/include
+            /usr/include
+            /usr/local/include
+            /sw/include
+            /opt/local/include
+            NO_DEFAULT_PATH
+            DOC "The directory where GLFW/glfw3.h resides"
+            )
+    find_library( GLFW_LIBRARY
+            NAMES
+            glfw3 glfw
+            PATHS
+            ${GLFW_LOCATION}/lib
+            $ENV{GLFW_LOCATION}/lib
+            /usr/lib64
+            /usr/lib
+            /usr/local/lib64
+            /usr/local/lib
+            /sw/lib
+            /opt/local/lib
+            /usr/lib/x86_64-linux-gnu
+            NO_DEFAULT_PATH
+            DOC "The GLFW library")
 endif ()
 
-# Search for the header
-FIND_PATH(GLFW3_INCLUDE_DIR "GLFW/glfw3.h"
-        PATHS ${_glfw3_HEADER_SEARCH_DIRS})
+find_package_handle_standard_args(GLFW DEFAULT_MSG
+        GLFW_INCLUDE_DIR
+        GLFW_LIBRARY
+        )
 
-# Search for the library
-FIND_LIBRARY(GLFW3_LIBRARY NAMES glfw3 glfw
-        PATHS ${_glfw3_LIB_SEARCH_DIRS})
-INCLUDE(FindPackageHandleStandardArgs)
-FIND_PACKAGE_HANDLE_STANDARD_ARGS(GLFW3 DEFAULT_MSG
-        GLFW3_LIBRARY GLFW3_INCLUDE_DIR)
+mark_as_advanced( GLFW_FOUND )

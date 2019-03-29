@@ -23,21 +23,19 @@ add_executable(${PROJECT_NAME}
         Simulator.h
         Plane.cpp
         Plane.h
-        Camera.cpp 
-        Camera.h 
+        Camera.cpp
+        Camera.h
         Timer.h
         )
 
-target_link_libraries(${PROJECT_NAME} OpenGL::GL)
+target_link_libraries(${PROJECT_NAME} PRIVATE OpenGL::GL)
 
 if (NOT WIN32)
-    find_package(glfw3 REQUIRED)
+    find_package(GLFW3 REQUIRED)
     find_package(GLM REQUIRED)
     find_package(GLEW REQUIRED)
 
-    target_link_libraries(${PROJECT_NAME}
-            glfw
-            GLEW::GLEW)
+    target_link_libraries(${PROJECT_NAME} PRIVATE ${GLFW_LIBRARY} GLEW::GLEW)
 else ()
     if (CMAKE_SIZEOF_VOID_P EQUAL 8)
         set(LIB_DIR "x64")

@@ -1,8 +1,9 @@
-#version 330 core
+#version 410 core
 
-out vec3 Color;
+out vec4 Color;
 
 in vec3 Normal;
+
 uniform vec3 color;
 uniform vec3 ambient;
 
@@ -11,5 +12,5 @@ uniform vec3 lightDirection;
 
 void main()
 {
-    Color = color * max(0.0f, dot(-lightDirection, Normal)) + ambient;
+    Color = vec4(color * max(0.0f, dot(-lightDirection, Normal)) + ambient * color, 0.3f);
 }

@@ -2,7 +2,8 @@
 
 #include <GLFW/glfw3.h>
 #include <iostream>
-#include <tuple>
+#include <thread>
+#include <chrono>
 
 #include "Camera.h"
 #include "Plane.h"
@@ -49,11 +50,18 @@ int main(int argc, char *argv[])
 	if (!glfwInit())
 		std::cout << "Could not init GLFW." << std::endl, exit(1);
 
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+	glfwSetErrorCallback([](int error, const char *description) {
+		std::cout << "GLFW error (" << error << "): " << description << std::endl;
+	});
 
-	auto *window = glfwCreateWindow(SCRWIDTH, SCRHEIGHT, "Fluid", nullptr, nullptr);
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 1);
+	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+#ifdef __APPLE__
+	glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
+#endif
+
+	GLFWwindow *window = glfwCreateWindow(SCRWIDTH, SCRHEIGHT, "Fluid", nullptr, nullptr);
 	if (!window)
 		std::cout << "Could not init GLFW window." << std::endl, exit(1);
 
@@ -70,7 +78,7 @@ int main(int argc, char *argv[])
 	auto *shader = new Shader("shaders/sphere.vert", "shaders/sphere.frag");
 	auto *planeShader = new Shader("shaders/plane.vert", "shaders/plane.frag");
 
-	SimulationParams simulationParams;
+	SimulationParams simulationParams{};
 	simulationParams.particleRadius = 1.0f;
 	simulationParams.smoothingRadius = 1.0f;
 	simulationParams.smoothingRadius2 = 1.0f;
@@ -79,19 +87,20 @@ int main(int argc, char *argv[])
 	simulationParams.particleMass = 0.1f;
 	simulationParams.particleViscosity = 1.0f;
 	simulationParams.particleDrag = 0.025f;
+
 	Simulator simulator(16);
 	const auto pid = simulator.addParams(simulationParams);
 	simulator.addParticles(PARTICLE_COUNT, pid);
 	simulator.addPlane(
-		Plane(vec3(0.0f, 0.0f, 0.0f), vec3(1.0f, 0.0f, 0.0f), vec3(0.0f, 0.0f, 1.0f), vec2(21.0f, 21.0f)));
+		Plane(vec3(0.0f, 0.0f, 0.0f), vec3(1.0f, 0.0f, 0.0f), vec3(0.0f, 0.0f, 1.0f), vec2(20.0f, 20.0f)));
 	simulator.addPlane(
-		Plane(vec3(-20.0f, 0.0f, 0.0f), vec3(0.0f, 0.0f, 1.0f), vec3(0.0f, 1.0f, 0.0f), vec2(20.0f, 15.0f)));
+		Plane(vec3(-20.0f, 7.5f, 0.0f), vec3(0.0f, 0.0f, 1.0f), vec3(0.0f, 1.0f, 0.0f), vec2(20.0f, 7.5f)));
 	simulator.addPlane(
-		Plane(vec3(20.0f, 0.0f, 0.0f), vec3(0.0f, 0.0f, -1.0f), vec3(0.0f, 1.0f, 0.0f), vec2(20.0f, 15.0f)));
+		Plane(vec3(20.0f, 7.5f, 0.0f), vec3(0.0f, 0.0f, -1.0f), vec3(0.0f, 1.0f, 0.0f), vec2(20.0f, 7.5f)));
 	simulator.addPlane(
-		Plane(vec3(0.0f, 0.0f, -20.0f), vec3(-1.0f, 0.0f, 0.0f), vec3(0.0f, 1.0f, 0.0f), vec2(20.0f, 15.0f)));
+		Plane(vec3(0.0f, 7.5f, -20.0f), vec3(-1.0f, 0.0f, 0.0f), vec3(0.0f, 1.0f, 0.0f), vec2(20.0f, 7.5f)));
 	simulator.addPlane(
-		Plane(vec3(0.0f, 0.0f, 20.0f), vec3(1.0f, 0.0f, 0.0f), vec3(0.0f, 1.0f, 0.0f), vec2(20.0f, 15.0f)));
+		Plane(vec3(0.0f, 7.5f, 20.0f), vec3(1.0f, 0.0f, 0.0f), vec3(0.0f, 1.0f, 0.0f), vec2(20.0f, 7.5f)));
 
 	const auto &particles = simulator.getParticles();
 	std::vector<vec3> positions;
@@ -103,12 +112,15 @@ int main(int argc, char *argv[])
 
 	glEnable(GL_VERTEX_PROGRAM_POINT_SIZE);
 	glEnable(GL_DEPTH_TEST);
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
 
 	std::string warn, err;
 	tinyobj::attrib_t attrib;
 	std::vector<tinyobj::shape_t> shapes;
 	std::vector<tinyobj::material_t> materials;
-	bool ret = tinyobj::LoadObj(&attrib, &shapes, &materials, &err, "Models/sphere.obj");
+	bool ret = tinyobj::LoadObj(&attrib, &shapes, &materials, &err, "models/sphere.obj");
 
 	if (!err.empty())
 		std::cout << "Model error: " << err << std::endl, exit(1);
@@ -165,15 +177,6 @@ int main(int argc, char *argv[])
 	glDisableVertexAttribArray(0);
 	glDisableVertexAttribArray(1);
 
-	/*GLuint positionBuffer, VAO;
-	glGenVertexArrays(1, &VAO);
-	glBindVertexArray(VAO);
-	glGenBuffers(1, &positionBuffer);
-	glBindBuffer(GL_ARRAY_BUFFER, positionBuffer);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(glm::vec3) * positions.size(), positions.data(), GL_DYNAMIC_DRAW);
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (void *)0);
-	glEnableVertexAttribArray(0);*/
-
 	shader->enable();
 	shader->setUniformMatrix4fv("view", glm::mat4(1.0f));
 	shader->setUniformMatrix4fv("projection", glm::mat4(1.0f));
@@ -218,8 +221,6 @@ int main(int argc, char *argv[])
 		glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 
 		shader->enable();
-		CHECKGL();
-
 		shader->setUniformMatrix4fv("view", camera.GetViewMatrix());
 		shader->setUniformMatrix4fv("projection", camera.GetProjectionMatrix(SCRWIDTH, SCRHEIGHT, 0.1f, 1e34f));
 		shader->setUniform1f("radius", simulationParams.particleRadius);
@@ -277,8 +278,12 @@ int main(int argc, char *argv[])
 		glfwPollEvents();
 		glfwSwapBuffers(window);
 
-		while ((elapsed = timer.elapsed()) <= (1000.0f / 60.0f)) // Lock to 60 fps
+		constexpr float desiredFrametime = 1000.0f / 60.0f;
+		elapsed = timer.elapsed();
+		if (elapsed != desiredFrametime)
 		{
+			std::this_thread::sleep_for(std::chrono::milliseconds(int(desiredFrametime - elapsed)));
+			elapsed = timer.elapsed();
 		}
 		timer.reset();
 	}
