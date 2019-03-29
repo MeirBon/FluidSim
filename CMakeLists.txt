@@ -43,7 +43,7 @@ else ()
         set(LIB_DIR "Win32")
     endif ()
 
-    target_link_libraries(${PROJECT_NAME}
+    target_link_libraries(${PROJECT_NAME} PRIVATE
             "${PROJECT_SOURCE_DIR}/lib/${LIB_DIR}/glew32.lib"
             "${PROJECT_SOURCE_DIR}/lib/${LIB_DIR}/glfw3.lib"
             )
