@@ -154,11 +154,12 @@ int main(int argc, char *argv[])
 		shader.setUniformMatrix4fv("view", camera.GetViewMatrix());
 		shader.setUniformMatrix4fv("projection", camera.GetProjectionMatrix(SCRWIDTH, SCRHEIGHT, 0.1f, 1e34f));
 		shader.setUniform1f("radius", simulationParams.particleRadius);
-		shader.setUniform3f("color", vec3(1.0f, 0.0f, 0.0f));
+		shader.setUniform3f("color", vec3(0.40f, 0.75f, 1.0f));
 
 		sphereVAO.bind();
 		for (const auto &p : particles)
 		{
+			shader.setUniform1f("pressure", p.pressure);
 			shader.setUniform3f("position", p.position);
 			glDrawArrays(GL_TRIANGLES, 0, vertices.size());
 		}

@@ -7,12 +7,14 @@ in vec3 Pos;
 
 uniform vec3 color;
 uniform vec3 ambient;
+uniform float pressure;
 
 uniform vec3 lightIntensity;
 uniform vec3 lightDirection;
 
 void main()
 {
+    float colorFactor = min(1.0f, max(1.0f - (pressure - 3000.0f) / 15000.0f, 0.01f));
     vec3 col = vec3(1.0f);
 
     const float Ka = 1.0f;
@@ -36,5 +38,5 @@ void main()
 
     col = Ka * ambient + Kd * lambertian * color + Ks * specular * vec3(1.0f);
 
-    Color = vec4(col, 1.0f);
+    Color = vec4(col * colorFactor, 1.0f);
 }
