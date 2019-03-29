@@ -4,7 +4,7 @@ constexpr float PI = float(M_PI);
 
 #define THREADED 1
 
-Simulator::Simulator(int rowSize) : m_RowSize(rowSize) { m_Pool = new ctpl::thread_pool(m_ThreadCount); }
+Simulator::Simulator(int rowSize, vec3 delta) : m_RowSize(rowSize), m_Delta(delta) { m_Pool = new ctpl::thread_pool(m_ThreadCount); }
 
 size_t Simulator::addParams(const SimulationParams &params)
 {
@@ -25,11 +25,37 @@ void Simulator::addParticles(size_t N, size_t parameterID)
 		const float y = 2.0f + (float(i) * oneOverRowSize * oneOverRowSize) * 1.1f;
 		const auto temp = float(mod(double(i) * (double)oneOverRowSize, double(m_RowSize)));
 		const float z = temp * (randFloat() * 0.2f - 0.1f);
-		m_Particles.emplace_back(vec3(x, y, z), parameterID);
+		m_Particles.emplace_back(vec3(x, y, z) + m_Delta, parameterID);
 	}
 }
 
 void Simulator::addPlane(Plane plane) { m_Collider.push_back(plane); }
+
+void Simulator::reset()
+{
+	if (m_Particles.empty())
+		return;
+
+	auto oldParticles = m_Particles;
+	m_Particles.clear();
+
+	int paramsId = m_Particles[0].parameterID;
+	int i = 0;
+
+	while (i < oldParticles.size())
+	{
+		size_t count = 0;
+
+		while (i < oldParticles.size() && oldParticles[i].parameterID == paramsId)
+		{
+			i++;
+			count++;
+		}
+
+		addParticles(count, paramsId);
+		paramsId = oldParticles[i].parameterID;
+	}
+}
 
 bool Simulator::intersect(const Plane &collider, const vec3 &position, float radius, vec3 &penetrationNormal,
 						  vec3 &penetrationPos, float &penetrationLength)

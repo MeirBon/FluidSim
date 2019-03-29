@@ -58,7 +58,7 @@ struct SimulationParams
 class Simulator
 {
   public:
-	explicit Simulator(int rowSize);
+	explicit Simulator(int rowSize, vec3 delta = vec3(0.0f));
 
 	~Simulator() = default;
 
@@ -84,6 +84,8 @@ class Simulator
 		computeCollisions();
 	}
 
+	void reset();
+
   private:
 	static bool intersect(const Plane &collider, const vec3 &position, float radius, vec3 &penetrationNormal,
 						  vec3 &penetrationPos, float &penetrationLength);
@@ -99,6 +101,7 @@ class Simulator
 	std::vector<Plane> m_Collider = {};
 	std::vector<Particle> m_Particles = {};
 	std::vector<SimulationParams> m_Params;
+	vec3 m_Delta;
 	int m_RowSize;
 	ctpl::thread_pool* m_Pool;
 	int m_ThreadCount = std::thread::hardware_concurrency();
