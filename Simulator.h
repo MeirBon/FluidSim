@@ -29,9 +29,12 @@ inline float randFloat()
 
 struct SimulationParams
 {
+	//Particle size
 	float particleRadius;
+	//Radius of influence - from SPH paper
 	float smoothingRadius;
-	float smoothingRadius2;
+	//Radius of influence squared. Kept for optimization purposes.
+	float smoothingRadiusPow2;
 	float restDensity;
 	float gravityMult;
 
@@ -46,7 +49,7 @@ struct SimulationParams
 	{
 		particleRadius = pRadius;
 		smoothingRadius = sRadius;
-		smoothingRadius2 = sRadius * sRadius;
+		smoothingRadiusPow2 = sRadius * sRadius;
 		restDensity = restDens;
 		gravityMult = gravMult;
 		particleMass = pMass;
@@ -78,6 +81,7 @@ class Simulator
 
 	inline void update(float timestep)
 	{
+		buildGrid();
 		computeDensityPressure();
 		computeForces();
 		integrate(timestep);
@@ -85,6 +89,8 @@ class Simulator
 	}
 
 	void reset();
+
+	void setParticleGridBounds(glm::vec3 minPoint, glm::vec3 maxPoint);
 
   private:
 	static bool intersect(const Plane &collider, const vec3 &position, float radius, vec3 &penetrationNormal,
@@ -97,10 +103,22 @@ class Simulator
 	void computeDensityPressure();
 	void computeForces();
 
+	void buildGrid();
+	i32vec3 getParticleGridPosition(glm::vec3 position);
+
   private:
+	static constexpr int gridDimX = 40 , gridDimY = 15 , gridDimZ = 40;
+
 	std::vector<Plane> m_Collider = {};
 	std::vector<Particle> m_Particles = {};
 	std::vector<SimulationParams> m_Params;
+	std::vector<int> particleGrid[gridDimX][gridDimY][gridDimZ];
+
+
+	//Effectively AABB of grid
+	vec3 worldMin{INFINITY, INFINITY, INFINITY};
+	vec3 worldMax{-INFINITY,-INFINITY,-INFINITY};
+
 	vec3 m_Delta;
 	int m_RowSize;
 	ctpl::thread_pool* m_Pool;

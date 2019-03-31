@@ -19,7 +19,7 @@
 
 using namespace glm;
 
-#define PARTICLE_COUNT 5000
+#define PARTICLE_COUNT 10000 
 #define SCRWIDTH 1024
 #define SCRHEIGHT 768
 
@@ -32,12 +32,15 @@ inline void CheckGL(int line)
 
 #define CHECKGL() CheckGL(__LINE__)
 
+// TODO(Dan): Temporarily moved this as a global variable because grid array is to big to fit on stack.
+Simulator simulator(16, vec3(-6.0f, 0.0f, 0.0f));
+
 int main(int argc, char *argv[])
 {
 	Timer timer{};
 	auto window = Window("FluidSim", SCRWIDTH, SCRHEIGHT);
 	Camera camera = Camera(vec3(0.0f, 25.0f, 30.0f));
-	
+
 	bool runSim = false;
 	auto shader = Shader("shaders/sphere.vert", "shaders/sphere.frag");
 	auto planeShader = Shader("shaders/plane.vert", "shaders/plane.frag");
@@ -45,26 +48,61 @@ int main(int argc, char *argv[])
 	SimulationParams simulationParams{};
 	simulationParams.particleRadius = .7f;
 	simulationParams.smoothingRadius = 1.0f;
-	simulationParams.smoothingRadius2 = 1.0f;
+	simulationParams.smoothingRadiusPow2 = 1.0f;
 	simulationParams.restDensity = 15.0f;
 	simulationParams.gravityMult = 2000.0f;
 	simulationParams.particleMass = 0.1f;
 	simulationParams.particleViscosity = 1.0f;
 	simulationParams.particleDrag = 0.025f;
 
-	Simulator simulator(16, vec3(-6.0f, 0.0f, 0.0f));
 	const auto pid = simulator.addParams(simulationParams);
 	simulator.addParticles(PARTICLE_COUNT, pid);
+
+	// Bottom plane
 	simulator.addPlane(
 		Plane(vec3(0.0f, 0.0f, 0.0f), vec3(1.0f, 0.0f, 0.0f), vec3(0.0f, 0.0f, 1.0f), vec2(20.0f, 20.0f)));
+
+	// Left plane
 	simulator.addPlane(
 		Plane(vec3(-20.0f, 7.5f, 0.0f), vec3(0.0f, 0.0f, 1.0f), vec3(0.0f, 1.0f, 0.0f), vec2(20.0f, 7.5f)));
+
+	// Right plane
 	simulator.addPlane(
 		Plane(vec3(20.0f, 7.5f, 0.0f), vec3(0.0f, 0.0f, -1.0f), vec3(0.0f, 1.0f, 0.0f), vec2(20.0f, 7.5f)));
+
+	// Far Plane
 	simulator.addPlane(
 		Plane(vec3(0.0f, 7.5f, -20.0f), vec3(-1.0f, 0.0f, 0.0f), vec3(0.0f, 1.0f, 0.0f), vec2(20.0f, 7.5f)));
+
+	// Near plane
 	simulator.addPlane(
 		Plane(vec3(0.0f, 7.5f, 20.0f), vec3(1.0f, 0.0f, 0.0f), vec3(0.0f, 1.0f, 0.0f), vec2(20.0f, 7.5f)));
+
+	// Get world bounds
+	// Effectively compute AABB of the world bound matrices.
+	// Easily moveable to a function if we define planes as moveable
+	vec3 minPoint{INFINITY, INFINITY, INFINITY};
+	vec3 maxPoint{-INFINITY, -INFINITY, -INFINITY};
+
+	for (const auto &plane : simulator.getPlanes())
+	{
+		vec3 edgePoint1 = plane.position + plane.right * plane.size.x;
+		vec3 edgePoint2 = plane.position - plane.right * plane.size.x;
+
+		vec3 edgePoint3 = plane.position + plane.forward * plane.size.y;
+		vec3 edgePoint4 = plane.position - plane.forward * plane.size.y;
+
+		minPoint = glm::min(minPoint, edgePoint1);
+		minPoint = glm::min(minPoint, edgePoint2);
+		minPoint = glm::min(minPoint, edgePoint3);
+		minPoint = glm::min(minPoint, edgePoint4);
+
+		maxPoint = glm::max(maxPoint, edgePoint1);
+		maxPoint = glm::max(maxPoint, edgePoint2);
+		maxPoint = glm::max(maxPoint, edgePoint3);
+		maxPoint = glm::max(maxPoint, edgePoint4);
+	}
+	simulator.setParticleGridBounds(minPoint, maxPoint);
 
 	const auto &particles = simulator.getParticles();
 
@@ -140,6 +178,7 @@ int main(int argc, char *argv[])
 	planeShader.disable();
 
 	timer.reset();
+	// TODO(Dan): Not obvious what elapsedSum does
 	float elapsed = 0.1f, elapsedSum = 0.0f;
 	while (!window.shouldClose())
 	{
