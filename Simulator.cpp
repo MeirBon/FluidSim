@@ -239,9 +239,7 @@ void Simulator::computeDensityPressure()
 				auto &pi = m_Particles[i];
 				pi.density = 0.0f;
 				const auto &paramsi = m_Params[pi.parameterID];
-				const float smoothingRadiusPow9 = paramsi.smoothingRadiusPow2 * paramsi.smoothingRadiusPow2 *
-												  paramsi.smoothingRadiusPow2 * paramsi.smoothingRadiusPow2 *
-												  paramsi.smoothingRadius;
+				const float &smoothingRadiusPow9 = paramsi.smoothingRadiusPow9;
 				i32vec3 particleGridSlot = getParticleGridPosition(pi.position);
 
 				i32vec3 begin = max(i32vec3{0, 0, 0}, particleGridSlot - 1);
@@ -339,7 +337,7 @@ void Simulator::computeDensityPressure()
 void Simulator::computeForces()
 {
 #if THREADED
-	// TODO(Dan): Recheck grid forr this & threading
+	// TODO(Dan): Recheck grid for this & threading
 	for (int tId = 0; tId < m_ThreadCount; tId++)
 	{
 		m_Jobs.push_back(m_Pool->push([this, tId](int) {
@@ -392,7 +390,7 @@ void Simulator::computeForces()
 					}
 				}
 
-				const vec3 forceGravity = vec3(0.0f, -9.81f, 0.0f) * pi.density * paramsi.gravityMult;
+				const vec3 forceGravity = -paramsi.gravity * pi.density * paramsi.gravityMult;
 				pi.forcePhysic = forcePressure + forceViscosity + forceGravity;
 			}
 		}));

@@ -1,11 +1,11 @@
 #pragma once
 
-#include "Plane.h"
 #include "Particle.h"
+#include "Plane.h"
+#include <cmath>
 #include <glm/glm.hpp>
 #include <random>
 #include <vector>
-#include <cmath>
 
 #include "ctpl_stl.h"
 
@@ -29,18 +29,22 @@ inline float randFloat()
 
 struct SimulationParams
 {
-	//Particle size
+	// Particle size
 	float particleRadius;
-	//Radius of influence - from SPH paper
+	// Radius of influence - from SPH paper
 	float smoothingRadius;
-	//Radius of influence squared. Kept for optimization purposes.
+	// Radius of influence squared. Kept for optimization purposes.
 	float smoothingRadiusPow2;
+	// Radius of influence to the power of 9. Kept for optimization purposes.
+	float smoothingRadiusPow9;
 	float restDensity;
 	float gravityMult;
 
 	float particleMass;
 	float particleViscosity;
 	float particleDrag;
+
+	vec3 gravity = vec3(0.0f, 9.81, 0.0f);
 
 	SimulationParams() = default;
 
@@ -75,12 +79,20 @@ class Simulator
 
 	inline size_t getParticleCount() const { return m_Particles.size(); }
 
-	inline const std::vector<SimulationParams> &getSimParams() const { return m_Params; }
+	inline std::vector<SimulationParams> &getSimParams() { return m_Params; }
 
 	inline const std::vector<Plane> &getPlanes() const { return m_Collider; }
 
 	inline void update(float timestep)
 	{
+		// Update every frame to accomodate for possible changing values.
+		for (auto& params : m_Params)
+		{
+			params.smoothingRadiusPow2 = params.smoothingRadius * params.smoothingRadius;
+			params.smoothingRadiusPow9 = params.smoothingRadiusPow2 * params.smoothingRadiusPow2 *
+										 params.smoothingRadiusPow2 * params.smoothingRadiusPow2 * params.smoothingRadius;
+		}
+
 		buildGrid();
 		computeDensityPressure();
 		computeForces();
@@ -107,21 +119,20 @@ class Simulator
 	i32vec3 getParticleGridPosition(glm::vec3 position);
 
   private:
-	static constexpr int gridDimX = 40 , gridDimY = 15 , gridDimZ = 40;
+	static constexpr int gridDimX = 25, gridDimY = 15, gridDimZ = 25;
 
 	std::vector<Plane> m_Collider = {};
 	std::vector<Particle> m_Particles = {};
 	std::vector<SimulationParams> m_Params;
 	std::vector<int> particleGrid[gridDimX][gridDimY][gridDimZ];
 
-
-	//Effectively AABB of grid
+	// Effectively AABB of grid
 	vec3 worldMin{INFINITY, INFINITY, INFINITY};
-	vec3 worldMax{-INFINITY,-INFINITY,-INFINITY};
+	vec3 worldMax{-INFINITY, -INFINITY, -INFINITY};
 
 	vec3 m_Delta;
 	int m_RowSize;
-	ctpl::thread_pool* m_Pool;
+	ctpl::thread_pool *m_Pool;
 	int m_ThreadCount = std::thread::hardware_concurrency();
 	std::vector<std::future<void>> m_Jobs;
 };

@@ -14,7 +14,8 @@ uniform vec3 lightDirection;
 
 void main()
 {
-    float colorFactor = min(1.0f, max(1.0f - (pressure - 3000.0f) / 15000.0f, 0.01f));
+    // float colorFactor = min(1.0f, max(1.0f - (pressure - 3000.0f) / 15000.0f, 0.01f));
+    float colorFactor = 1.0f;
     vec3 col = vec3(1.0f);
 
     const float Ka = 1.0f;

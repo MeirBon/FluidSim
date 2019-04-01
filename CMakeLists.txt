@@ -11,7 +11,7 @@ set(CMAKE_MODULE_PATH "${CMAKE_MODULE_PATH}" "${PROJECT_SOURCE_DIR}/CMakeModules
 
 find_package(OpenGL REQUIRED)
 
-include_directories("${PROJECT_SOURCE_DIR}/include")
+include_directories("${PROJECT_SOURCE_DIR}/include" "${PROJECT_SOURCE_DIR}/ImGui")
 
 add_executable(${PROJECT_NAME}
         main.cpp
@@ -26,6 +26,20 @@ add_executable(${PROJECT_NAME}
         Camera.cpp
         Camera.h
         Timer.h
+        ImGui/imconfig.h
+        ImGui/imgui.cpp
+        ImGui/imgui.h
+        ImGui/imgui_demo.cpp
+        ImGui/imgui_draw.cpp
+        ImGui/imgui_widgets.cpp
+        ImGui/imgui_internal.h
+        ImGui/ImGuiGLFW.cpp
+        ImGui/ImGuiGLFW.h
+        ImGui/ImGuiOpenGL3.cpp
+        ImGui/ImGuiOpenGL3.h
+        ImGui/imstb_rectpack.h
+        ImGui/imstb_textedit.h
+        ImGui/imstb_truetype.h
         )
 
 target_link_libraries(${PROJECT_NAME} PRIVATE OpenGL::GL)

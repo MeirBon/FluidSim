@@ -19,7 +19,7 @@
 
 using namespace glm;
 
-#define PARTICLE_COUNT 10000 
+#define PARTICLE_COUNT 10000
 #define SCRWIDTH 1024
 #define SCRHEIGHT 768
 
@@ -45,17 +45,18 @@ int main(int argc, char *argv[])
 	auto shader = Shader("shaders/sphere.vert", "shaders/sphere.frag");
 	auto planeShader = Shader("shaders/plane.vert", "shaders/plane.frag");
 
-	SimulationParams simulationParams{};
-	simulationParams.particleRadius = .7f;
-	simulationParams.smoothingRadius = 1.0f;
-	simulationParams.smoothingRadiusPow2 = 1.0f;
-	simulationParams.restDensity = 15.0f;
-	simulationParams.gravityMult = 2000.0f;
-	simulationParams.particleMass = 0.1f;
-	simulationParams.particleViscosity = 1.0f;
-	simulationParams.particleDrag = 0.025f;
+	SimulationParams params{};
+	params.particleRadius = .7f;
+	params.smoothingRadius = 1.0f;
+	params.smoothingRadiusPow2 = 1.0f;
+	params.restDensity = 15.0f;
+	params.gravityMult = 2000.0f;
+	params.particleMass = 0.1f;
+	params.particleViscosity = 1.0f;
+	params.particleDrag = 0.025f;
 
-	const auto pid = simulator.addParams(simulationParams);
+	const auto pid = simulator.addParams(params);
+	SimulationParams &simulationParams = simulator.getSimParams()[0];
 	simulator.addParticles(PARTICLE_COUNT, pid);
 
 	// Bottom plane
@@ -245,6 +246,19 @@ int main(int argc, char *argv[])
 			runSim = !runSim, elapsedSum = 0.0f;
 		if (keys[GLFW_KEY_BACKSPACE] && elapsedSum > 200.0f)
 			simulator.reset(), elapsedSum = 0.0f;
+
+		ImGui::Begin("Params");
+
+		ImGui::DragFloat("Mass", &simulationParams.particleMass);
+		ImGui::DragFloat("Radius", &simulationParams.particleRadius, 0.005f, 0.7f, 10.0f);
+		ImGui::DragFloat("Drag", &simulationParams.particleDrag, 0.005f, 0.0f, 10.0f);
+		ImGui::DragFloat("Viscosity", &simulationParams.particleViscosity, 0.005f, 0.0f, 10.0f);
+		ImGui::DragFloat("Smoothing Radius", &simulationParams.smoothingRadius, 0.005f, 0.0f, 10.0f);
+		ImGui::DragFloat("Gravity", &simulationParams.gravity.y, 0.01f, 0.0f, 100.0f);
+		if (ImGui::Button("reset"))
+			simulationParams = params, simulator.reset();
+
+		ImGui::End();
 
 		window.pollEvents();
 		window.present();

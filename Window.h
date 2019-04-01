@@ -5,6 +5,8 @@
 
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
+#include <ImGuiGLFW.h>
+#include <ImGuiOpenGL3.h>
 
 class Window
 {
@@ -23,6 +25,7 @@ class Window
 
   private:
 	GLFWwindow *m_Window;
+	ImGuiContext *m_Context;
 };
 
 static Window *instance = nullptr;
@@ -65,10 +68,24 @@ Window::Window(const char *title, int width, int height)
 
 	keys = new bool[512];
 	memset(keys, 0, 512 * sizeof(bool));
+
+	IMGUI_CHECKVERSION();
+	m_Context = ImGui::CreateContext();
+	ImGui::StyleColorsDark();
+
+	ImGui_ImplGlfw_InitForOpenGL(m_Window, true);
+	ImGui_ImplOpenGL3_Init("#version 150");
+
+	ImGui_ImplOpenGL3_NewFrame();
+	ImGui_ImplGlfw_NewFrame();
+	ImGui::NewFrame();
 }
 
 Window::~Window()
 {
+	ImGui_ImplOpenGL3_Shutdown();
+	ImGui_ImplGlfw_Shutdown();
+	ImGui::DestroyContext(m_Context);
 	delete[] keys;
 	glfwDestroyWindow(m_Window);
 	glfwTerminate();
@@ -76,7 +93,17 @@ Window::~Window()
 
 void Window::pollEvents() { glfwPollEvents(); }
 bool Window::shouldClose() { return glfwWindowShouldClose(m_Window) == 1; }
-void Window::present() { glfwSwapBuffers(m_Window); }
+void Window::present()
+{
+	ImGui::Render();
+	ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+
+	glfwSwapBuffers(m_Window);
+
+	ImGui_ImplOpenGL3_NewFrame();
+	ImGui_ImplGlfw_NewFrame();
+	ImGui::NewFrame();
+}
 void Window::setTitle(const char *title) { glfwSetWindowTitle(m_Window, title); }
 void Window::close() { glfwSetWindowShouldClose(m_Window, 1); }
 
