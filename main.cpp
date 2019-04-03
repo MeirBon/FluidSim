@@ -14,14 +14,18 @@
 #include "VertexArray.h"
 #include "Window.h"
 
+#include <MeshReconstruction.h>
+
 #define TINYOBJLOADER_IMPLEMENTATION
 #include "tiny_obj_loader.h"
 
 using namespace glm;
+using namespace MeshReconstruction;
 
 #define PARTICLE_COUNT 10000
 #define SCRWIDTH 1024
 #define SCRHEIGHT 768
+#define DRAW_MESH 1
 
 inline void CheckGL(int line)
 {
@@ -43,6 +47,7 @@ int main(int argc, char *argv[])
 
 	bool runSim = false;
 	auto shader = Shader("shaders/sphere.vert", "shaders/sphere.frag");
+	auto meshShader = Shader("shaders/mesh.vert", "shaders/mesh.frag");
 	auto planeShader = Shader("shaders/plane.vert", "shaders/plane.frag");
 
 	SimulationParams params{};
@@ -112,6 +117,7 @@ int main(int argc, char *argv[])
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
+#if !DRAW_MESH
 	std::string warn, err;
 	tinyobj::attrib_t attrib;
 	std::vector<tinyobj::shape_t> shapes;
@@ -159,6 +165,7 @@ int main(int argc, char *argv[])
 	auto sphereVAO = VertexArray();
 	sphereVAO.assignBuffer(0, vBuffer);
 	sphereVAO.assignBuffer(1, nBuffer);
+#endif
 
 	shader.enable();
 	shader.setUniformMatrix4fv("view", glm::mat4(1.0f));
@@ -168,6 +175,15 @@ int main(int argc, char *argv[])
 	shader.setUniform3f("lightDirection", glm::normalize(vec3(-1.0f, 1.0f, 0.0f)));
 	shader.setUniform3f("ambient", vec3(0.1f));
 	shader.disable();
+
+	meshShader.enable();
+	meshShader.setUniformMatrix4fv("view", glm::mat4(1.0f));
+	meshShader.setUniformMatrix4fv("projection", glm::mat4(1.0f));
+	meshShader.setUniformMatrix4fv("model", glm::mat4(1.0f));
+	meshShader.setUniform3f("lightIntensity", vec3(1.0f));
+	meshShader.setUniform3f("lightDirection", glm::normalize(vec3(-1.0f, 1.0f, 0.0f)));
+	meshShader.setUniform3f("ambient", vec3(0.1f));
+	meshShader.disable();
 
 	planeShader.enable();
 	planeShader.setUniformMatrix4fv("view", glm::mat4(1.0f));
@@ -179,8 +195,9 @@ int main(int argc, char *argv[])
 	planeShader.disable();
 
 	timer.reset();
-	// TODO(Dan): Not obvious what elapsedSum does
+	// TODO(Dan): Not obvious what elapsedSum does (Meir): It's used when a button is pressed, makes sure you don't keep switching toggles 
 	float elapsed = 0.1f, elapsedSum = 0.0f;
+	simulator.update(0.0f);
 	while (!window.shouldClose())
 	{
 		elapsedSum += elapsed;
@@ -190,6 +207,7 @@ int main(int argc, char *argv[])
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 
+#if !DRAW_MESH
 		shader.enable();
 		shader.setUniformMatrix4fv("view", camera.GetViewMatrix());
 		shader.setUniformMatrix4fv("projection", camera.GetProjectionMatrix(SCRWIDTH, SCRHEIGHT, 0.1f, 1e34f));
@@ -205,6 +223,21 @@ int main(int argc, char *argv[])
 		}
 		CHECKGL();
 		sphereVAO.unbind();
+#else
+		meshShader.enable();
+		meshShader.setUniformMatrix4fv("view", camera.GetViewMatrix());
+		meshShader.setUniformMatrix4fv("projection", camera.GetProjectionMatrix(SCRWIDTH, SCRHEIGHT, 0.1f, 1e34f));
+		meshShader.setUniform1f("radius", simulationParams.particleRadius);
+		meshShader.setUniform3f("color", vec3(0.40f, 0.75f, 1.0f));
+
+		glm::mat4 model(1.0f);
+		model = translate(model, vec3(-20.0f, 0.0f, -20.0f));
+		meshShader.setUniformMatrix4fv("model", model);
+
+		simulator.extractSurface(meshShader);
+		meshShader.disable();
+		CHECKGL();
+#endif
 
 		planeShader.enable();
 		planeShader.setUniformMatrix4fv("view", camera.GetViewMatrix());
@@ -248,7 +281,7 @@ int main(int argc, char *argv[])
 			simulator.reset(), elapsedSum = 0.0f;
 
 		ImGui::Begin("Params");
-
+		ImGui::Text("Running: %i", runSim);
 		ImGui::DragFloat("Mass", &simulationParams.particleMass);
 		ImGui::DragFloat("Radius", &simulationParams.particleRadius, 0.005f, 0.7f, 10.0f);
 		ImGui::DragFloat("Drag", &simulationParams.particleDrag, 0.005f, 0.0f, 10.0f);

@@ -9,6 +9,8 @@ project(FluidSim)
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_MODULE_PATH "${CMAKE_MODULE_PATH}" "${PROJECT_SOURCE_DIR}/CMakeModules")
 
+add_subdirectory(deps/MeshReconstruction)
+
 find_package(OpenGL REQUIRED)
 
 include_directories("${PROJECT_SOURCE_DIR}/include" "${PROJECT_SOURCE_DIR}/ImGui")
@@ -40,9 +42,13 @@ add_executable(${PROJECT_NAME}
         ImGui/imstb_rectpack.h
         ImGui/imstb_textedit.h
         ImGui/imstb_truetype.h
+        Buffer.cpp
+        Buffer.h
+        VertexArray.cpp
+        VertexArray.h
         )
 
-target_link_libraries(${PROJECT_NAME} PRIVATE OpenGL::GL)
+target_link_libraries(${PROJECT_NAME} PRIVATE OpenGL::GL MeshReconstruction)
 
 if (NOT WIN32)
     find_package(GLFW3 REQUIRED)
@@ -60,6 +66,8 @@ else ()
     target_link_libraries(${PROJECT_NAME} PRIVATE
             "${PROJECT_SOURCE_DIR}/lib/${LIB_DIR}/glew32.lib"
             "${PROJECT_SOURCE_DIR}/lib/${LIB_DIR}/glfw3.lib"
+            "${PROJECT_SOURCE_DIR}/lib/${LIB_DIR}/PolyVoxCore.lib"
+            "${PROJECT_SOURCE_DIR}/lib/${LIB_DIR}/PolyVoxUtil.lib"
             )
 
     file(GLOB DLLS "${PROJECT_SOURCE_DIR}/dll/${LIB_DIR}/*.dll")

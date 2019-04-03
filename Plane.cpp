@@ -8,7 +8,7 @@ Plane::Plane(vec3 pos, vec3 r, vec3 f, vec2 dims) : position(pos), right(r), for
 	std::vector<vec3> normals;
 	const vec3 offsetRight = r * dims.x;
 	const vec3 offsetForward = f * dims.y;
-	const vec3 normal = glm::normalize(glm::cross(f, r));
+	const vec3 normal = glm::normalize(glm::cross(r, f));
 
 	vertices.push_back(pos - offsetRight - offsetForward);
 	vertices.push_back(pos + offsetRight - offsetForward);

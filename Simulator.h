@@ -2,16 +2,30 @@
 
 #include "Particle.h"
 #include "Plane.h"
+#include "Buffer.h"
+#include "VertexArray.h"
+
 #include <cmath>
 #include <glm/glm.hpp>
 #include <random>
 #include <vector>
+
+#include <PolyVoxCore/MarchingCubesSurfaceExtractor.h>
+#include <PolyVoxCore/SimpleVolume.h>
+#include <PolyVoxCore/SurfaceMesh.h>
 
 #include "ctpl_stl.h"
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
 #endif
+
+template <>
+inline PolyVox::DefaultMarchingCubesController<float>::DensityType
+PolyVox::DefaultMarchingCubesController<float>::getThreshold()
+{
+	return 3.f;
+}
 
 using namespace glm;
 
@@ -86,11 +100,12 @@ class Simulator
 	inline void update(float timestep)
 	{
 		// Update every frame to accomodate for possible changing values.
-		for (auto& params : m_Params)
+		for (auto &params : m_Params)
 		{
 			params.smoothingRadiusPow2 = params.smoothingRadius * params.smoothingRadius;
 			params.smoothingRadiusPow9 = params.smoothingRadiusPow2 * params.smoothingRadiusPow2 *
-										 params.smoothingRadiusPow2 * params.smoothingRadiusPow2 * params.smoothingRadius;
+										 params.smoothingRadiusPow2 * params.smoothingRadiusPow2 *
+										 params.smoothingRadius;
 		}
 
 		buildGrid();
@@ -104,6 +119,10 @@ class Simulator
 
 	void setParticleGridBounds(glm::vec3 minPoint, glm::vec3 maxPoint);
 
+	float calculateDensity(const vec3 &pos);
+
+	void extractSurface(Shader &shader);
+
   private:
 	static bool intersect(const Plane &collider, const vec3 &position, float radius, vec3 &penetrationNormal,
 						  vec3 &penetrationPos, float &penetrationLength);
@@ -114,9 +133,16 @@ class Simulator
 
 	void computeDensityPressure();
 	void computeForces();
-
 	void buildGrid();
+
 	i32vec3 getParticleGridPosition(glm::vec3 position);
+
+
+	PolyVox::Vector3DInt32 worldPosToVoxelIdx(const vec3 &worldPos, int xDim, int yDim, int zDim) const;
+	vec3 voxelIndexToWorldPos(int voxelX, int voxelY, int voxelZ, float xDim, float yDim, float zDim) const;
+
+	void fillVoxelVolume();
+
 
   private:
 	static constexpr int gridDimX = 25, gridDimY = 15, gridDimZ = 25;
@@ -129,10 +155,18 @@ class Simulator
 	// Effectively AABB of grid
 	vec3 worldMin{INFINITY, INFINITY, INFINITY};
 	vec3 worldMax{-INFINITY, -INFINITY, -INFINITY};
+	vec3 worldLengths{};
 
 	vec3 m_Delta;
 	int m_RowSize;
 	ctpl::thread_pool *m_Pool;
 	int m_ThreadCount = std::thread::hardware_concurrency();
 	std::vector<std::future<void>> m_Jobs;
+
+	PolyVox::SimpleVolume<float>* voxelVolume;
+	PolyVox::SurfaceMesh<PolyVox::PositionMaterialNormal> surfaceMesh;
+	PolyVox::MarchingCubesSurfaceExtractor<PolyVox::SimpleVolume<float>>* surfaceExtractor;
+
+	GLuint fluidVBO, fluidEBO, VAO;
+	bool firstLaunch = true;
 };

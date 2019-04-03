@@ -5,6 +5,7 @@ constexpr float PI = float(M_PI);
 #define THREADED 1
 #define USE_GRID 1
 
+using namespace PolyVox;
 // Get the position in a grid of a particle. Returns {grid.x,grid.y,grid.z} vector of indices
 // of the grid in which the particle resides.
 i32vec3 Simulator::getParticleGridPosition(glm::vec3 position)
@@ -74,6 +75,14 @@ void Simulator::setParticleGridBounds(glm::vec3 minPoint, glm::vec3 maxPoint)
 {
 	worldMin = minPoint;
 	worldMax = maxPoint;
+	worldLengths = worldMax - worldMin;
+	const auto halfLenghts = worldLengths / 2.0f;
+
+	voxelVolume = new SimpleVolume<float>({Vector3DInt32(-worldLengths.x, -worldLengths.y, -worldLengths.z),
+										   Vector3DInt32(worldLengths.x, worldLengths.y, worldLengths.z)});
+
+	surfaceExtractor = new MarchingCubesSurfaceExtractor<PolyVox::SimpleVolume<float>>(
+		voxelVolume, voxelVolume->getEnclosingRegion(), &surfaceMesh);
 }
 
 void Simulator::addParticles(size_t N, size_t parameterID)
@@ -426,7 +435,7 @@ void Simulator::computeForces()
 				const vec3 rijNorm = rij / r;
 				const float pressureSum = pi.pressure + pj.pressure;
 				const vec3 delta_v = pj.velocity - pi.velocity;
-				const float fourtyFiveOverPI_SR6 = 45.0f / (PI * smoothingRadius6);
+				con + st float fourtyFiveOverPI_SR6 = 45.0f / (PI * smoothingRadius6);
 
 				forcePressure += -rijNorm * paramsi.particleMass * pressureSum / (2.0f * pj.density) *
 								 fourtyFiveOverPI_SR6 * sRmin_r * sRmin_r;
@@ -439,4 +448,131 @@ void Simulator::computeForces()
 		pi.forcePhysic = forcePressure + forceViscosity + forceGravity;
 	}
 #endif
+}
+
+vec3 Simulator::voxelIndexToWorldPos(int voxelX, int voxelY, int voxelZ, float xDim, float yDim, float zDim) const
+{
+	const float x = float(voxelX);
+	const float y = float(voxelY);
+	const float z = float(voxelZ);
+
+	return vec3(x / 2.0f, y + 15.0f / 3.0f * 2.0f, z / 2.0f);
+}
+
+PolyVox::Vector3DInt32 Simulator::worldPosToVoxelIdx(const vec3 &worldPos, int xDim, int yDim, int zDim) const
+{
+	const int x = worldPos.x * 2.0f;
+	const int y = worldPos.y * 1.5f - 15.0f;
+	const int z = worldPos.z * 2.0f;
+	return {x, y, z};
+}
+
+void Simulator::fillVoxelVolume()
+{
+	const auto voxelRegion = voxelVolume->getEnclosingRegion();
+	const auto &lowerCorner = voxelRegion.getLowerCorner();
+	const auto &upperCorner = voxelRegion.getUpperCorner();
+
+	const float xDim = float(upperCorner.getX() - lowerCorner.getX());
+	const float yDim = float(upperCorner.getY() - lowerCorner.getY());
+	const float zDim = float(upperCorner.getZ() - lowerCorner.getZ());
+
+#pragma omp parallel for
+	for (int z = lowerCorner.getZ(); z <= upperCorner.getZ(); z++)
+	{
+		for (int y = lowerCorner.getY(); y <= upperCorner.getY(); y++)
+		{
+			for (int x = lowerCorner.getX(); x <= upperCorner.getX(); x++)
+			{
+				const float dens = calculateDensity(voxelIndexToWorldPos(x, y, z, xDim, yDim, zDim));
+				//printf("%i %i %i, %f\n", x, y, z, dens);
+				voxelVolume->setVoxelAt(x, y, z, dens);
+			}
+		}
+	}
+}
+
+void Simulator::extractSurface(Shader &shader)
+{
+	fillVoxelVolume();
+	surfaceExtractor->execute();
+
+	const auto voxelRegion = voxelVolume->getEnclosingRegion();
+	const auto &lowerCorner = voxelRegion.getLowerCorner();
+	const auto &upperCorner = voxelRegion.getUpperCorner();
+
+	const std::vector<PositionMaterialNormal> &waterMeshVerts = surfaceMesh.getVertices();
+	const std::vector<uint32_t> &waterMeshIndices = surfaceMesh.getIndices();
+
+	//std::cout << waterMeshVerts.size() << std::endl;
+
+	const vec3 correction = vec3(2.0f, 3.0f / 2.0f, 2.0f);
+	shader.setUniform3f("correction", correction);
+
+	if (firstLaunch)
+	{
+		glGenVertexArrays(1, &VAO);
+		glBindVertexArray(VAO);
+
+		glGenBuffers(1, &fluidVBO);
+		glBindBuffer(GL_ARRAY_BUFFER, fluidVBO);
+
+		glGenBuffers(1, &fluidEBO);
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, fluidEBO);
+
+		glEnableVertexAttribArray(0);
+		glEnableVertexAttribArray(1);
+		glEnableVertexAttribArray(2);
+		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(PositionMaterialNormal), (void *)0);
+		glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(PositionMaterialNormal), (void *)(3 * sizeof(float)));
+		glVertexAttribPointer(2, 1, GL_FLOAT, GL_FALSE, sizeof(PositionMaterialNormal), (void *)(6 * sizeof(float)));
+		glBindVertexArray(0);
+	}
+
+	glBindVertexArray(VAO);
+	glBindBuffer(GL_ARRAY_BUFFER, fluidVBO);
+	glBufferData(GL_ARRAY_BUFFER, waterMeshVerts.size() * sizeof(PositionMaterialNormal), waterMeshVerts.data(),
+				 GL_STREAM_DRAW);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, fluidEBO);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, waterMeshIndices.size() * sizeof(uint32_t), waterMeshIndices.data(),
+				 GL_STREAM_DRAW);
+
+	glDrawElements(GL_TRIANGLES, (GLsizei)waterMeshIndices.size(), GL_UNSIGNED_INT, nullptr);
+}
+
+inline float poly6(const float rSqLen, float h)
+{
+	return 315.f / (64.f * glm::pi<float>() * powf(h, 9)) * powf(max(0.0f, h * h - rSqLen), 3.f);
+}
+
+float Simulator::calculateDensity(const vec3 &pos)
+{
+	i32vec3 particleGridSlot = getParticleGridPosition(pos);
+
+	i32vec3 begin = max(i32vec3{0, 0, 0}, particleGridSlot - 1);
+	i32vec3 end = min(i32vec3{gridDimX - 1, gridDimY - 1, gridDimZ - 1}, particleGridSlot + 1);
+
+	float rho = 0.0f;
+	const float hSq = m_Params[0].particleRadius * m_Params[0].particleRadius;
+	const float &mass = m_Params[0].particleMass;
+
+	for (int i = begin.x; i <= end.x; ++i)
+	{
+		for (int j = begin.y; j <= end.y; ++j)
+		{
+			for (int k = begin.z; k <= end.z; ++k)
+			{
+				const auto &grid = particleGrid[i][j][k];
+				for (const auto &pjIndex : grid)
+				{
+					const auto &position = m_Particles[i].position;
+					const vec3 posDiff = pos - position;
+					const float sqLength = dot(posDiff, posDiff);
+					rho += 1.0f;
+					//rho += poly6(sqLength, m_Params[0].particleRadius);
+				}
+			}
+		}
+	}
+	return rho * mass;
 }
