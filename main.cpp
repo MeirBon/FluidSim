@@ -240,7 +240,10 @@ int main(int argc, char *argv[])
 		meshShader.setUniform3f("color", vec3(0.40f, 0.75f, 1.0f));
 
 		glm::mat4 model(1.0f);
-		model = translate(glm::scale(model, vec3(1.f)), vec3(-20.0f, 0.0f, -20.0f));
+		const float scale = 1.0f / simulator.getVoxelScale() * 2.0f;
+		const auto worldMin = simulator.getWorldMin();
+		model = glm::translate(model, {worldMin.x, 0.0f, worldMin.z});
+		model = glm::scale(model, vec3(scale));
 		meshShader.setUniformMatrix4fv("model", model);
 
 		simulator.extractSurface(meshShader);

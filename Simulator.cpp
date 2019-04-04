@@ -1,7 +1,6 @@
 #include "Simulator.h"
 
 constexpr float PI = float(M_PI);
-constexpr float voxelResScale = 2.0f;
 
 #define THREADED 1
 #define USE_GRID 1

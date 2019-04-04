@@ -131,6 +131,10 @@ class Simulator
 
 	void extractSurface(Shader &shader);
 
+	inline const vec3 &getWorldMin() const { return worldMin; }
+
+	inline float getVoxelScale() { return voxelResScale; }
+
   private:
 	static bool intersect(const Plane &collider, const vec3 &position, float radius, vec3 &penetrationNormal,
 						  vec3 &penetrationPos, float &penetrationLength);
@@ -174,4 +178,5 @@ class Simulator
 
 	GLuint fluidVBO, fluidEBO, VAO;
 	bool firstLaunch = true;
+	const float voxelResScale = 1.5f;
 };
