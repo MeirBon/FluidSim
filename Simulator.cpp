@@ -357,12 +357,11 @@ void Simulator::computeForces()
 				vec3 forceViscosity = vec3(0.0f);
 				const auto &paramsi = m_Params[pi.parameterID];
 
-				const float smoothingRadius6 =
-					paramsi.smoothingRadiusPow2 * paramsi.smoothingRadiusPow2 * paramsi.smoothingRadiusPow2;
-				i32vec3 particleGridSlot = getParticleGridPosition(pi.position);
+				const float &smoothingRadius6 = paramsi.smoothingRadiusPow6;
+				const i32vec3 particleGridSlot = getParticleGridPosition(pi.position);
 
-				i32vec3 begin = max(i32vec3{0, 0, 0}, particleGridSlot - 1);
-				i32vec3 end = min(i32vec3{gridDimX - 1, gridDimY - 1, gridDimZ - 1}, particleGridSlot + 1);
+				const i32vec3 begin = max(i32vec3{0, 0, 0}, particleGridSlot - 1);
+				const i32vec3 end = min(i32vec3{gridDimX - 1, gridDimY - 1, gridDimZ - 1}, particleGridSlot + 1);
 
 				for (int i = begin.x; i <= end.x; ++i)
 				{
@@ -485,7 +484,7 @@ void Simulator::fillVoxelVolume()
 			for (int x = lowerCorner.getX(); x <= upperCorner.getX(); x++)
 			{
 				const float dens = calculateDensity(voxelIndexToWorldPos(x, y, z, xDim, yDim, zDim));
-				//printf("%i %i %i, %f\n", x, y, z, dens);
+				// printf("%i %i %i, %f\n", x, y, z, dens);
 				voxelVolume->setVoxelAt(x, y, z, dens);
 			}
 		}
@@ -504,7 +503,7 @@ void Simulator::extractSurface(Shader &shader)
 	const std::vector<PositionMaterialNormal> &waterMeshVerts = surfaceMesh.getVertices();
 	const std::vector<uint32_t> &waterMeshIndices = surfaceMesh.getIndices();
 
-	//std::cout << waterMeshVerts.size() << std::endl;
+	// std::cout << waterMeshVerts.size() << std::endl;
 
 	const vec3 correction = vec3(2.0f, 3.0f / 2.0f, 2.0f);
 	shader.setUniform3f("correction", correction);
@@ -569,7 +568,7 @@ float Simulator::calculateDensity(const vec3 &pos)
 					const vec3 posDiff = pos - position;
 					const float sqLength = dot(posDiff, posDiff);
 					rho += 1.0f;
-					//rho += poly6(sqLength, m_Params[0].particleRadius);
+					// rho += poly6(sqLength, m_Params[0].particleRadius);
 				}
 			}
 		}

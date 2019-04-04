@@ -1,8 +1,8 @@
 #pragma once
 
+#include "Buffer.h"
 #include "Particle.h"
 #include "Plane.h"
-#include "Buffer.h"
 #include "VertexArray.h"
 
 #include <cmath>
@@ -43,14 +43,11 @@ inline float randFloat()
 
 struct SimulationParams
 {
+	friend class Simulator;
 	// Particle size
 	float particleRadius;
 	// Radius of influence - from SPH paper
 	float smoothingRadius;
-	// Radius of influence squared. Kept for optimization purposes.
-	float smoothingRadiusPow2;
-	// Radius of influence to the power of 9. Kept for optimization purposes.
-	float smoothingRadiusPow9;
 	float restDensity;
 	float gravityMult;
 
@@ -67,13 +64,22 @@ struct SimulationParams
 	{
 		particleRadius = pRadius;
 		smoothingRadius = sRadius;
-		smoothingRadiusPow2 = sRadius * sRadius;
+
+		smoothingRadiusPow2 = powf(sRadius, 2.0f);
+		smoothingRadiusPow6 = powf(sRadius, 6.0f);
+		smoothingRadiusPow9 = powf(sRadius, 9.0f);
+
 		restDensity = restDens;
 		gravityMult = gravMult;
 		particleMass = pMass;
 		particleViscosity = pVisc;
 		particleDrag = pDrag;
 	}
+
+	// Optimization variables
+	float smoothingRadiusPow2;
+	float smoothingRadiusPow6;
+	float smoothingRadiusPow9;
 };
 
 class Simulator
@@ -103,6 +109,8 @@ class Simulator
 		for (auto &params : m_Params)
 		{
 			params.smoothingRadiusPow2 = params.smoothingRadius * params.smoothingRadius;
+			params.smoothingRadiusPow6 =
+				params.smoothingRadiusPow2 * params.smoothingRadiusPow2 * params.smoothingRadiusPow2;
 			params.smoothingRadiusPow9 = params.smoothingRadiusPow2 * params.smoothingRadiusPow2 *
 										 params.smoothingRadiusPow2 * params.smoothingRadiusPow2 *
 										 params.smoothingRadius;
@@ -137,12 +145,10 @@ class Simulator
 
 	i32vec3 getParticleGridPosition(glm::vec3 position);
 
-
 	PolyVox::Vector3DInt32 worldPosToVoxelIdx(const vec3 &worldPos, int xDim, int yDim, int zDim) const;
 	vec3 voxelIndexToWorldPos(int voxelX, int voxelY, int voxelZ, float xDim, float yDim, float zDim) const;
 
 	void fillVoxelVolume();
-
 
   private:
 	static constexpr int gridDimX = 25, gridDimY = 15, gridDimZ = 25;
@@ -163,10 +169,11 @@ class Simulator
 	int m_ThreadCount = std::thread::hardware_concurrency();
 	std::vector<std::future<void>> m_Jobs;
 
-	PolyVox::SimpleVolume<float>* voxelVolume;
+	PolyVox::SimpleVolume<float> *voxelVolume;
 	PolyVox::SurfaceMesh<PolyVox::PositionMaterialNormal> surfaceMesh;
-	PolyVox::MarchingCubesSurfaceExtractor<PolyVox::SimpleVolume<float>>* surfaceExtractor;
+	PolyVox::MarchingCubesSurfaceExtractor<PolyVox::SimpleVolume<float>> *surfaceExtractor;
 
 	GLuint fluidVBO, fluidEBO, VAO;
 	bool firstLaunch = true;
 };
+

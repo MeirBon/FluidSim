@@ -24,6 +24,9 @@ using namespace glm;
 #define SCRHEIGHT 768
 #define DRAW_MESH 1
 
+static bool firstMouse = false;
+static double lastMouseX, lastMouseY;
+
 inline void CheckGL(int line)
 {
 	GLenum err;
@@ -35,12 +38,16 @@ inline void CheckGL(int line)
 
 // TODO(Dan): Temporarily moved this as a global variable because grid array is to big to fit on stack.
 Simulator simulator(16, vec3(-6.0f, 0.0f, 0.0f));
+static Camera camera = Camera(vec3(0.0f, 25.0f, 30.0f));
+static Window window = Window("FluidSim", SCRWIDTH, SCRHEIGHT);
 
 int main(int argc, char *argv[])
 {
 	Timer timer{};
-	auto window = Window("FluidSim", SCRWIDTH, SCRHEIGHT);
-	Camera camera = Camera(vec3(0.0f, 25.0f, 30.0f));
+	window.setMouseCallback([](double x, double y) {
+		if (window.keys[GLFW_MOUSE_BUTTON_RIGHT])
+			camera.ProcessMouseMovement(float(x), -float(y));
+	});
 
 	bool runSim = false;
 	auto shader = Shader("shaders/sphere.vert", "shaders/sphere.frag");
@@ -192,11 +199,16 @@ int main(int argc, char *argv[])
 	planeShader.disable();
 
 	timer.reset();
-	// TODO(Dan): Not obvious what elapsedSum does (Meir): It's used when a button is pressed, makes sure you don't keep switching toggles
+	// TODO(Dan): Not obvious what elapsedSum does (Meir): It's used when a button is pressed, makes sure you don't keep
+	// switching toggles
 	float elapsed = 0.1f, elapsedSum = 0.0f;
 	simulator.update(0.0f);
 	while (!window.shouldClose())
 	{
+		const auto size = window.getSize();
+		const int width = std::get<0>(size);
+		const int height = std::get<1>(size);
+
 		elapsedSum += elapsed;
 		if (runSim)
 			simulator.update(elapsed);
@@ -207,7 +219,7 @@ int main(int argc, char *argv[])
 #if !DRAW_MESH
 		shader.enable();
 		shader.setUniformMatrix4fv("view", camera.GetViewMatrix());
-		shader.setUniformMatrix4fv("projection", camera.GetProjectionMatrix(SCRWIDTH, SCRHEIGHT, 0.1f, 1e34f));
+		shader.setUniformMatrix4fv("projection", camera.GetProjectionMatrix(width, height, 0.1f, 1e34f));
 		shader.setUniform1f("radius", simulationParams.particleRadius);
 		shader.setUniform3f("color", vec3(0.40f, 0.75f, 1.0f));
 
@@ -223,7 +235,7 @@ int main(int argc, char *argv[])
 #else
 		meshShader.enable();
 		meshShader.setUniformMatrix4fv("view", camera.GetViewMatrix());
-		meshShader.setUniformMatrix4fv("projection", camera.GetProjectionMatrix(SCRWIDTH, SCRHEIGHT, 0.1f, 1e34f));
+		meshShader.setUniformMatrix4fv("projection", camera.GetProjectionMatrix(width, height, 0.1f, 1e34f));
 		meshShader.setUniform1f("radius", simulationParams.particleRadius);
 		meshShader.setUniform3f("color", vec3(0.40f, 0.75f, 1.0f));
 
@@ -238,7 +250,7 @@ int main(int argc, char *argv[])
 
 		planeShader.enable();
 		planeShader.setUniformMatrix4fv("view", camera.GetViewMatrix());
-		planeShader.setUniformMatrix4fv("projection", camera.GetProjectionMatrix(SCRWIDTH, SCRHEIGHT, 0.1f, 1e34f));
+		planeShader.setUniformMatrix4fv("projection", camera.GetProjectionMatrix(width, height, 0.1f, 1e34f));
 
 		for (const auto &plane : simulator.getPlanes())
 		{
@@ -248,6 +260,7 @@ int main(int argc, char *argv[])
 
 		const auto *keys = window.keys;
 
+		elapsed *= 3.0f;
 		if (keys[GLFW_KEY_LEFT_SHIFT])
 			elapsed *= 5.0f;
 		if (keys[GLFW_KEY_Q] || keys[GLFW_KEY_ESCAPE])
