@@ -5,13 +5,15 @@ if (DEFINED ENV{VCPKG_ROOT} AND NOT DEFINED CMAKE_TOOLCHAIN_FILE)
 endif ()
 
 project(FluidSim)
+enable_language(CUDA)
 
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_MODULE_PATH "${CMAKE_MODULE_PATH}" "${PROJECT_SOURCE_DIR}/CMakeModules")
 
+find_library(CUDART_LIBRARY cudart ${CMAKE_CUDA_IMPLICIT_LINK_DIRECTORIES})
 find_package(OpenGL REQUIRED)
 link_directories("${CMAKE_SOURCE_DIR}/lib")
-include_directories("${PROJECT_SOURCE_DIR}/include" "${PROJECT_SOURCE_DIR}/ImGui")
+include_directories("${PROJECT_SOURCE_DIR}/include" "${PROJECT_SOURCE_DIR}/ImGui" "${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES}")
 
 add_executable(${PROJECT_NAME}
         main.cpp
@@ -44,9 +46,14 @@ add_executable(${PROJECT_NAME}
         Buffer.h
         VertexArray.cpp
         VertexArray.h
-        )
+		Kernel.cu
+		Kernel.cuh
+)
 
-target_link_libraries(${PROJECT_NAME} PRIVATE OpenGL::GL)
+set_target_properties(${PROJECT_NAME} PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
+target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_11)
+
+target_link_libraries(${PROJECT_NAME} PRIVATE OpenGL::GL $cudart)
 if(APPLE)
     find_library(COCOA_LIBRARY Cocoa)
     find_library(IOKit_LIBRARY IOKit)

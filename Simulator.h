@@ -20,11 +20,17 @@
 #define M_PI 3.14159265358979323846
 #endif
 
+#define gridDimX 30
+#define gridDimY 15
+#define gridDimZ 30
+
+#define bucketCapacity 2048
+
 template <>
 inline PolyVox::DefaultMarchingCubesController<float>::DensityType
 PolyVox::DefaultMarchingCubesController<float>::getThreshold()
 {
-	return .7f;
+	return .1f;
 }
 
 using namespace glm;
@@ -125,6 +131,10 @@ class Simulator
 		computeCollisions();
 	}
 
+	inline size_t getPlaneCount() const { return m_Collider.size(); }
+
+	inline std::vector<Particle> &getParticles() { return m_Particles; }
+
 	void reset();
 
 	void setParticleGridBounds(glm::vec3 minPoint, glm::vec3 maxPoint);
@@ -134,8 +144,11 @@ class Simulator
 	void extractSurface(Shader &shader);
 
 	inline const vec3 &getWorldMin() const { return worldMin; }
+	inline const vec3 &getWorldMax() const { return worldMax; }
 
 	inline float getVoxelScale() { return voxelResScale; }
+
+	void buildGrid();
 
   private:
 	static bool intersect(const Plane &collider, const vec3 &position, float radius, vec3 &penetrationNormal,
@@ -147,7 +160,6 @@ class Simulator
 
 	void computeDensityPressure();
 	void computeForces();
-	void buildGrid();
 
 	i32vec3 getParticleGridPosition(glm::vec3 position);
 
@@ -156,8 +168,6 @@ class Simulator
 	void fillVoxelVolume();
 
   private:
-	static constexpr int gridDimX = 25, gridDimY = 15, gridDimZ = 25;
-
 	std::vector<Plane> m_Collider = {};
 	std::vector<Particle> m_Particles = {};
 	std::vector<SimulationParams> m_Params;
@@ -171,7 +181,8 @@ class Simulator
 	vec3 m_Delta;
 	int m_RowSize;
 	ctpl::thread_pool *m_Pool;
-	int m_ThreadCount = std::thread::hardware_concurrency();
+	// int m_ThreadCount = std::thread::hardware_concurrency();
+	int m_ThreadCount = 1;
 	std::vector<std::future<void>> m_Jobs;
 
 	PolyVox::SimpleVolume<float> *voxelVolume;
@@ -180,7 +191,7 @@ class Simulator
 
 	GLuint fluidVBO, fluidEBO, VAO;
 	bool firstLaunch = true;
-	const float voxelResScale = 2.0f;
+	const float voxelResScale = 1.0f;
 
 	std::vector<float> poly6LookupTable{};
 };

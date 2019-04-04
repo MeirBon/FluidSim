@@ -5,6 +5,8 @@
 #include <iostream>
 #include <thread>
 
+#include "Kernel.cuh"
+
 #include "Buffer.h"
 #include "Camera.h"
 #include "Plane.h"
@@ -19,12 +21,12 @@
 
 using namespace glm;
 
-#define PARTICLE_COUNT 30000
+#define PARTICLE_COUNT 20000
 #define SCRWIDTH 1024
 #define SCRHEIGHT 768
 #define DRAW_MESH 1
 
-static bool firstMouse = false, drawMesh = true;
+static bool firstMouse = false, drawMesh = false;
 static double lastMouseX, lastMouseY;
 
 inline void CheckGL(int line)
@@ -55,7 +57,7 @@ int main(int argc, char *argv[])
 	auto planeShader = Shader("shaders/plane.vert", "shaders/plane.frag");
 
 	SimulationParams params{};
-	params.particleRadius = .7f;
+	params.particleRadius = .9f;
 	params.smoothingRadius = 1.0f;
 	params.smoothingRadiusPow2 = 1.0f;
 	params.restDensity = 15.0f;
@@ -132,6 +134,14 @@ int main(int argc, char *argv[])
 	if (!ret)
 		exit(1);
 
+	Particle *gpuParticles;
+	Plane *gpuPlanes;
+
+	cudaMalloc(&gpuParticles, PARTICLE_COUNT * sizeof(Particle));
+	cudaMalloc(&gpuPlanes, simulator.getPlaneCount() * sizeof(Plane));
+	cudaMemcpy(gpuPlanes, simulator.getPlanes().data(), simulator.getPlaneCount() * sizeof(Plane),
+			   cudaMemcpyHostToDevice);
+
 	std::vector<vec3> vertices, normals;
 	for (auto &s : shapes)
 	{
@@ -200,16 +210,40 @@ int main(int argc, char *argv[])
 	// TODO(Dan): Not obvious what elapsedSum does (Meir): It's used when a button is pressed, makes sure you don't keep
 	// switching toggles
 	float elapsed = 0.1f, elapsedSum = 0.0f;
-	simulator.update(0.0f);
+	// simulator.update(0.0f);
+
+	cudaMemcpy(gpuParticles, simulator.getParticles().data(), PARTICLE_COUNT * sizeof(Particle),
+			   cudaMemcpyHostToDevice);
+
+	int *gridCounter;
+	int *gridIndices;
+	cudaMalloc(&gridCounter, gridDimX * gridDimY * gridDimZ * sizeof(int));
+	cudaMalloc(&gridIndices, gridDimX * gridDimY * gridDimZ * bucketCapacity * sizeof(int) + bucketCapacity);
+
+	simulator.buildGrid();
+
+	std::cout << gridDimX * gridDimY * gridDimZ * bucketCapacity << std::endl;
 	while (!window.shouldClose())
 	{
+		simulationParams.smoothingRadiusPow2 = powf(params.smoothingRadius, 2.0f);
+		simulationParams.smoothingRadiusPow6 = powf(params.smoothingRadius, 6.0f);
+		simulationParams.smoothingRadiusPow9 = powf(params.smoothingRadius, 9.0f);
+
+		if (runSim)
+			LaunchKernels(gpuParticles, PARTICLE_COUNT, simulationParams, gpuPlanes, simulator.getPlaneCount(), DT,
+						  gridCounter, gridIndices, simulator.getWorldMin(), simulator.getWorldMax());
+		cudaMemcpy(simulator.getParticles().data(), gpuParticles, PARTICLE_COUNT * sizeof(Particle),
+				   cudaMemcpyDeviceToHost);
+
 		const auto size = window.getSize();
 		const int width = std::get<0>(size);
 		const int height = std::get<1>(size);
 
 		elapsedSum += elapsed;
-		if (runSim)
-			simulator.update(elapsed);
+		// if (runSim)
+		//	simulator.update(elapsed);
+
+		simulator.buildGrid();
 
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
@@ -292,7 +326,12 @@ int main(int argc, char *argv[])
 		if (keys[GLFW_KEY_R] && elapsedSum > 200.0f)
 			runSim = !runSim, elapsedSum = 0.0f;
 		if (keys[GLFW_KEY_BACKSPACE] && elapsedSum > 200.0f)
-			simulator.reset(), elapsedSum = 0.0f;
+		{
+			simulator.reset();
+			cudaMemcpy(gpuParticles, simulator.getParticles().data(), PARTICLE_COUNT * sizeof(Particle),
+					   cudaMemcpyHostToDevice);
+			elapsedSum = 0.0f;
+		}
 
 		ImGui::Begin("Params");
 		ImGui::Text("Running: %i", runSim);
@@ -304,7 +343,13 @@ int main(int argc, char *argv[])
 		ImGui::DragFloat("Smoothing Radius", &simulationParams.smoothingRadius, 0.005f, 0.0f, 10.0f);
 		ImGui::DragFloat("Gravity", &simulationParams.gravity.y, 0.01f, 0.0f, 100.0f);
 		if (ImGui::Button("reset"))
-			simulationParams = params, simulator.reset();
+		{
+			simulationParams = params;
+			simulator.reset();
+			cudaMemcpy(gpuParticles, simulator.getParticles().data(), PARTICLE_COUNT * sizeof(Particle),
+					   cudaMemcpyHostToDevice);
+			elapsedSum = 0.0f;
+		}
 
 		ImGui::End();
 
@@ -320,6 +365,11 @@ int main(int argc, char *argv[])
 		}
 		timer.reset();
 	}
+
+	cudaFree(gpuParticles);
+	cudaFree(gpuPlanes);
+	cudaFree(gridCounter);
+	cudaFree(gridIndices);
 
 	return 0;
 }

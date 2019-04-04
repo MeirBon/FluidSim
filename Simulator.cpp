@@ -16,21 +16,13 @@ inline float poly6(const float rSqLen, float h)
 // of the grid in which the particle resides.
 i32vec3 Simulator::getParticleGridPosition(glm::vec3 position)
 {
-	glm::vec3 normalized_position = (position - worldMin) / (worldMax - worldMin);
+	const vec3 normalized_position = (position - worldMin) / (worldMax - worldMin);
 
 	// Find buckets to place particles in
 	// Could be written vectorized but explicit is easier to understand
-	int bucketX = std::max(0, int(normalized_position.x * gridDimX));
-	int bucketY = std::max(0, int(normalized_position.y * gridDimY));
-	int bucketZ = std::max(0, int(normalized_position.z * gridDimZ));
-
-	// Handle edgecase where normalized_position = 1.
-	if (bucketX >= gridDimX)
-		bucketX = gridDimX - 1;
-	if (bucketY >= gridDimY)
-		bucketY = gridDimY - 1;
-	if (bucketZ >= gridDimZ)
-		bucketZ = gridDimZ - 1;
+	int bucketX = min(max(0, int(normalized_position.x * gridDimX)), gridDimX - 1);
+	int bucketY = min(max(0, int(normalized_position.y * gridDimY)), gridDimY - 1);
+	int bucketZ = min(max(0, int(normalized_position.z * gridDimZ)), gridDimZ - 1);
 
 	return {bucketX, bucketY, bucketZ};
 }
@@ -64,6 +56,7 @@ void Simulator::buildGrid()
 	{
 		// Get data between 0 and 1
 		const auto &particle = m_Particles[i];
+
 		i32vec3 buckets = getParticleGridPosition(m_Particles[i].position);
 
 #if 0
@@ -454,7 +447,7 @@ void Simulator::computeForces()
 				const vec3 rijNorm = rij / r;
 				const float pressureSum = pi.pressure + pj.pressure;
 				const vec3 delta_v = pj.velocity - pi.velocity;
-				con + st float fourtyFiveOverPI_SR6 = 45.0f / (PI * smoothingRadius6);
+				const float fourtyFiveOverPI_SR6 = 45.0f / (PI * smoothingRadius6);
 
 				forcePressure += -rijNorm * paramsi.particleMass * pressureSum / (2.0f * pj.density) *
 								 fourtyFiveOverPI_SR6 * sRmin_r * sRmin_r;
@@ -483,7 +476,30 @@ void Simulator::fillVoxelVolume()
 	const auto &lowerCorner = voxelRegion.getLowerCorner();
 	const auto &upperCorner = voxelRegion.getUpperCorner();
 
-#pragma omp parallel for
+	std::vector<std::future<void>> jobs;
+
+	for (int i = 0; i < m_ThreadCount; i++)
+	{
+		jobs.push_back(m_Pool->push([this, i, &lowerCorner, &upperCorner](int) {
+			for (int z = lowerCorner.getZ() + i; z <= upperCorner.getZ(); z += m_ThreadCount)
+			{
+				for (int y = lowerCorner.getY(); y <= upperCorner.getY(); y++)
+				{
+					for (int x = lowerCorner.getX(); x <= upperCorner.getX(); x++)
+					{
+						const float dens = calculateDensity(voxelIndexToWorldPos(x, y, z));
+						// printf("%i %i %i, %f\n", x, y, z, dens);
+						voxelVolume->setVoxelAt(x, y, z, dens);
+					}
+				}
+			}
+		}));
+	}
+
+	for (auto &job : jobs)
+		job.get();
+
+#if 0
 	for (int z = lowerCorner.getZ(); z <= upperCorner.getZ(); z++)
 	{
 		for (int y = lowerCorner.getY(); y <= upperCorner.getY(); y++)
@@ -496,6 +512,7 @@ void Simulator::fillVoxelVolume()
 			}
 		}
 	}
+#endif
 }
 
 void Simulator::extractSurface(Shader &shader)
@@ -557,7 +574,6 @@ float Simulator::calculateDensity(const vec3 &pos)
 	const float &mass = m_Params[0].particleMass;
 	const float idxFactor = 1.0f / float(poly6LookupTable.size());
 
-#pragma omp parallel for
 	for (int i = begin.x; i <= end.x; ++i)
 	{
 		for (int j = begin.y; j <= end.y; ++j)
