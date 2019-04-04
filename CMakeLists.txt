@@ -9,10 +9,8 @@ project(FluidSim)
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_MODULE_PATH "${CMAKE_MODULE_PATH}" "${PROJECT_SOURCE_DIR}/CMakeModules")
 
-add_subdirectory(deps/MeshReconstruction)
-
 find_package(OpenGL REQUIRED)
-
+link_directories("${CMAKE_SOURCE_DIR}/lib")
 include_directories("${PROJECT_SOURCE_DIR}/include" "${PROJECT_SOURCE_DIR}/ImGui")
 
 add_executable(${PROJECT_NAME}
@@ -48,7 +46,13 @@ add_executable(${PROJECT_NAME}
         VertexArray.h
         )
 
-target_link_libraries(${PROJECT_NAME} PRIVATE OpenGL::GL MeshReconstruction)
+target_link_libraries(${PROJECT_NAME} PRIVATE OpenGL::GL)
+if(APPLE)
+    find_library(COCOA_LIBRARY Cocoa)
+    find_library(IOKit_LIBRARY IOKit)
+    find_library(CoreVideo_LIBRARY CoreVideo)
+    target_link_libraries(${PROJECT_NAME} PRIVATE ${CoreVideo_LIBRARY} ${IOKit_LIBRARY} ${COCOA_LIBRARY})
+endif()
 
 if (NOT WIN32)
     find_package(GLFW3 REQUIRED)
@@ -56,6 +60,7 @@ if (NOT WIN32)
     find_package(GLEW REQUIRED)
 
     target_link_libraries(${PROJECT_NAME} PRIVATE ${GLFW_LIBRARY} GLEW::GLEW)
+    target_link_libraries(${PROJECT_NAME} PRIVATE ${GLFW_LIBRARY} PolyVoxCore PolyVoxUtil)
 else ()
     if (CMAKE_SIZEOF_VOID_P EQUAL 8)
         set(LIB_DIR "x64")
@@ -64,11 +69,11 @@ else ()
     endif ()
 
     target_link_libraries(${PROJECT_NAME} PRIVATE
-            "${PROJECT_SOURCE_DIR}/lib/${LIB_DIR}/glew32.lib"
-            "${PROJECT_SOURCE_DIR}/lib/${LIB_DIR}/glfw3.lib"
-            "${PROJECT_SOURCE_DIR}/lib/${LIB_DIR}/PolyVoxCore.lib"
-            "${PROJECT_SOURCE_DIR}/lib/${LIB_DIR}/PolyVoxUtil.lib"
-            )
+        "${PROJECT_SOURCE_DIR}/lib/${LIB_DIR}/glew32.lib"
+        "${PROJECT_SOURCE_DIR}/lib/${LIB_DIR}/glfw3.lib"
+        "${PROJECT_SOURCE_DIR}/lib/${LIB_DIR}/PolyVoxCore.lib"
+        "${PROJECT_SOURCE_DIR}/lib/${LIB_DIR}/PolyVoxUtil.lib"
+    )
 
     file(GLOB DLLS "${PROJECT_SOURCE_DIR}/dll/${LIB_DIR}/*.dll")
     file(COPY ${DLLS} DESTINATION ${CMAKE_CURRENT_BINARY_DIR})

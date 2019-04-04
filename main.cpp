@@ -14,13 +14,10 @@
 #include "VertexArray.h"
 #include "Window.h"
 
-#include <MeshReconstruction.h>
-
 #define TINYOBJLOADER_IMPLEMENTATION
 #include "tiny_obj_loader.h"
 
 using namespace glm;
-using namespace MeshReconstruction;
 
 #define PARTICLE_COUNT 10000
 #define SCRWIDTH 1024
@@ -195,7 +192,7 @@ int main(int argc, char *argv[])
 	planeShader.disable();
 
 	timer.reset();
-	// TODO(Dan): Not obvious what elapsedSum does (Meir): It's used when a button is pressed, makes sure you don't keep switching toggles 
+	// TODO(Dan): Not obvious what elapsedSum does (Meir): It's used when a button is pressed, makes sure you don't keep switching toggles
 	float elapsed = 0.1f, elapsedSum = 0.0f;
 	simulator.update(0.0f);
 	while (!window.shouldClose())
