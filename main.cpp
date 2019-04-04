@@ -240,7 +240,7 @@ int main(int argc, char *argv[])
 		meshShader.setUniform3f("color", vec3(0.40f, 0.75f, 1.0f));
 
 		glm::mat4 model(1.0f);
-		model = translate(model, vec3(-20.0f, 0.0f, -20.0f));
+		model = translate(glm::scale(model, vec3(1.f)), vec3(-20.0f, 0.0f, -20.0f));
 		meshShader.setUniformMatrix4fv("model", model);
 
 		simulator.extractSurface(meshShader);

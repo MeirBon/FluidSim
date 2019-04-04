@@ -1,6 +1,7 @@
 #include "Simulator.h"
 
 constexpr float PI = float(M_PI);
+constexpr float voxelResScale = 2.0f;
 
 #define THREADED 1
 #define USE_GRID 1
@@ -78,8 +79,11 @@ void Simulator::setParticleGridBounds(glm::vec3 minPoint, glm::vec3 maxPoint)
 	worldLengths = worldMax - worldMin;
 	const auto halfLenghts = worldLengths / 2.0f;
 
-	voxelVolume = new SimpleVolume<float>({Vector3DInt32(-worldLengths.x, -worldLengths.y, -worldLengths.z),
-										   Vector3DInt32(worldLengths.x, worldLengths.y, worldLengths.z)});
+	const Vector3DInt32 min = {int(worldMin.x * voxelResScale), 0, int(worldMin.z * voxelResScale)};
+	const Vector3DInt32 max = {int(worldMax.x * voxelResScale), int(worldLengths.y * voxelResScale),
+							   int(worldMax.z * voxelResScale)};
+
+	voxelVolume = new SimpleVolume<float>({min, max});
 
 	surfaceExtractor = new MarchingCubesSurfaceExtractor<PolyVox::SimpleVolume<float>>(
 		voxelVolume, voxelVolume->getEnclosingRegion(), &surfaceMesh);
@@ -449,20 +453,11 @@ void Simulator::computeForces()
 #endif
 }
 
-vec3 Simulator::voxelIndexToWorldPos(int voxelX, int voxelY, int voxelZ, float xDim, float yDim, float zDim) const
+vec3 Simulator::voxelIndexToWorldPos(int voxelX, int voxelY, int voxelZ) const
 {
-	const float x = float(voxelX);
-	const float y = float(voxelY);
-	const float z = float(voxelZ);
-
-	return vec3(x / 2.0f, y + 15.0f / 3.0f * 2.0f, z / 2.0f);
-}
-
-PolyVox::Vector3DInt32 Simulator::worldPosToVoxelIdx(const vec3 &worldPos, int xDim, int yDim, int zDim) const
-{
-	const int x = worldPos.x * 2.0f;
-	const int y = worldPos.y * 1.5f - 15.0f;
-	const int z = worldPos.z * 2.0f;
+	const float x = float(voxelX) / voxelResScale;
+	const float y = float(voxelY) / voxelResScale;
+	const float z = float(voxelZ) / voxelResScale;
 	return {x, y, z};
 }
 
@@ -472,10 +467,6 @@ void Simulator::fillVoxelVolume()
 	const auto &lowerCorner = voxelRegion.getLowerCorner();
 	const auto &upperCorner = voxelRegion.getUpperCorner();
 
-	const float xDim = float(upperCorner.getX() - lowerCorner.getX());
-	const float yDim = float(upperCorner.getY() - lowerCorner.getY());
-	const float zDim = float(upperCorner.getZ() - lowerCorner.getZ());
-
 #pragma omp parallel for
 	for (int z = lowerCorner.getZ(); z <= upperCorner.getZ(); z++)
 	{
@@ -483,7 +474,7 @@ void Simulator::fillVoxelVolume()
 		{
 			for (int x = lowerCorner.getX(); x <= upperCorner.getX(); x++)
 			{
-				const float dens = calculateDensity(voxelIndexToWorldPos(x, y, z, xDim, yDim, zDim));
+				const float dens = calculateDensity(voxelIndexToWorldPos(x, y, z));
 				// printf("%i %i %i, %f\n", x, y, z, dens);
 				voxelVolume->setVoxelAt(x, y, z, dens);
 			}
@@ -541,7 +532,7 @@ void Simulator::extractSurface(Shader &shader)
 
 inline float poly6(const float rSqLen, float h)
 {
-	return 315.f / (64.f * glm::pi<float>() * powf(h, 9)) * powf(max(0.0f, h * h - rSqLen), 3.f);
+	return 315.f / (64.f * glm::pi<float>() * powf(h, 9.0f)) * powf(max(0.0f, h * h - rSqLen), 3.f);
 }
 
 float Simulator::calculateDensity(const vec3 &pos)
@@ -555,6 +546,7 @@ float Simulator::calculateDensity(const vec3 &pos)
 	const float hSq = m_Params[0].particleRadius * m_Params[0].particleRadius;
 	const float &mass = m_Params[0].particleMass;
 
+#pragma omp parallel for
 	for (int i = begin.x; i <= end.x; ++i)
 	{
 		for (int j = begin.y; j <= end.y; ++j)
@@ -564,14 +556,14 @@ float Simulator::calculateDensity(const vec3 &pos)
 				const auto &grid = particleGrid[i][j][k];
 				for (const auto &pjIndex : grid)
 				{
-					const auto &position = m_Particles[i].position;
+					const auto &position = m_Particles[pjIndex].position;
 					const vec3 posDiff = pos - position;
 					const float sqLength = dot(posDiff, posDiff);
-					rho += 1.0f;
-					// rho += poly6(sqLength, m_Params[0].particleRadius);
+					rho += (1.0f / sqLength);
 				}
 			}
 		}
 	}
+
 	return rho * mass;
 }

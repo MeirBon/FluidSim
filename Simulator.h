@@ -24,7 +24,7 @@ template <>
 inline PolyVox::DefaultMarchingCubesController<float>::DensityType
 PolyVox::DefaultMarchingCubesController<float>::getThreshold()
 {
-	return 3.f;
+	return 1.0f;
 }
 
 using namespace glm;
@@ -145,8 +145,7 @@ class Simulator
 
 	i32vec3 getParticleGridPosition(glm::vec3 position);
 
-	PolyVox::Vector3DInt32 worldPosToVoxelIdx(const vec3 &worldPos, int xDim, int yDim, int zDim) const;
-	vec3 voxelIndexToWorldPos(int voxelX, int voxelY, int voxelZ, float xDim, float yDim, float zDim) const;
+	vec3 voxelIndexToWorldPos(int voxelX, int voxelY, int voxelZ) const;
 
 	void fillVoxelVolume();
 
@@ -176,4 +175,3 @@ class Simulator
 	GLuint fluidVBO, fluidEBO, VAO;
 	bool firstLaunch = true;
 };
-
