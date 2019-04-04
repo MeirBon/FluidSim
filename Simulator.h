@@ -24,7 +24,7 @@ template <>
 inline PolyVox::DefaultMarchingCubesController<float>::DensityType
 PolyVox::DefaultMarchingCubesController<float>::getThreshold()
 {
-	return 1.0f;
+	return .7f;
 }
 
 using namespace glm;
@@ -77,6 +77,7 @@ struct SimulationParams
 	}
 
 	// Optimization variables
+	float particleRadiusPow2;
 	float smoothingRadiusPow2;
 	float smoothingRadiusPow6;
 	float smoothingRadiusPow9;
@@ -108,6 +109,7 @@ class Simulator
 		// Update every frame to accomodate for possible changing values.
 		for (auto &params : m_Params)
 		{
+			params.particleRadiusPow2 = params.particleRadius * params.particleRadius;
 			params.smoothingRadiusPow2 = params.smoothingRadius * params.smoothingRadius;
 			params.smoothingRadiusPow6 =
 				params.smoothingRadiusPow2 * params.smoothingRadiusPow2 * params.smoothingRadiusPow2;
@@ -178,5 +180,7 @@ class Simulator
 
 	GLuint fluidVBO, fluidEBO, VAO;
 	bool firstLaunch = true;
-	const float voxelResScale = 1.5f;
+	const float voxelResScale = 2.0f;
+
+	std::vector<float> poly6LookupTable{};
 };

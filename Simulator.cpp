@@ -6,6 +6,12 @@ constexpr float PI = float(M_PI);
 #define USE_GRID 1
 
 using namespace PolyVox;
+
+inline float poly6(const float rSqLen, float h)
+{
+	return 315.f / (64.f * glm::pi<float>() * powf(h, 9.0f)) * powf(max(0.0f, h * h - rSqLen), 3.f);
+}
+
 // Get the position in a grid of a particle. Returns {grid.x,grid.y,grid.z} vector of indices
 // of the grid in which the particle resides.
 i32vec3 Simulator::getParticleGridPosition(glm::vec3 position)
@@ -86,6 +92,17 @@ void Simulator::setParticleGridBounds(glm::vec3 minPoint, glm::vec3 maxPoint)
 
 	surfaceExtractor = new MarchingCubesSurfaceExtractor<PolyVox::SimpleVolume<float>>(
 		voxelVolume, voxelVolume->getEnclosingRegion(), &surfaceMesh);
+
+	const vec3 bucketSize = {(worldMax.x - worldMin.x) / float(gridDimX), (worldMax.y - worldMin.y) / float(gridDimY),
+							 (worldMax.z - worldMin.z) / float(gridDimZ)};
+	const float maxLength = glm::max(bucketSize.x, glm::max(bucketSize.y, bucketSize.z));
+
+	const float factor = 1.0f / 1024.0f;
+	for (int i = 0; i < 1024; i++)
+	{
+		const float distance2 = float(i) * factor;
+		poly6LookupTable.push_back(poly6(distance2, m_Params[0].particleRadius));
+	}
 }
 
 void Simulator::addParticles(size_t N, size_t parameterID)
@@ -529,11 +546,6 @@ void Simulator::extractSurface(Shader &shader)
 	glDrawElements(GL_TRIANGLES, (GLsizei)waterMeshIndices.size(), GL_UNSIGNED_INT, nullptr);
 }
 
-inline float poly6(const float rSqLen, float h)
-{
-	return 315.f / (64.f * glm::pi<float>() * powf(h, 9.0f)) * powf(max(0.0f, h * h - rSqLen), 3.f);
-}
-
 float Simulator::calculateDensity(const vec3 &pos)
 {
 	i32vec3 particleGridSlot = getParticleGridPosition(pos);
@@ -542,8 +554,8 @@ float Simulator::calculateDensity(const vec3 &pos)
 	i32vec3 end = min(i32vec3{gridDimX - 1, gridDimY - 1, gridDimZ - 1}, particleGridSlot + 1);
 
 	float rho = 0.0f;
-	const float hSq = m_Params[0].particleRadius * m_Params[0].particleRadius;
 	const float &mass = m_Params[0].particleMass;
+	const float idxFactor = 1.0f / float(poly6LookupTable.size());
 
 #pragma omp parallel for
 	for (int i = begin.x; i <= end.x; ++i)
@@ -557,8 +569,12 @@ float Simulator::calculateDensity(const vec3 &pos)
 				{
 					const auto &position = m_Particles[pjIndex].position;
 					const vec3 posDiff = pos - position;
-					const float sqLength = dot(posDiff, posDiff);
-					rho += (1.0f / sqLength);
+					const float distance2 = dot(posDiff, posDiff);
+					if (distance2 < m_Params[0].particleRadiusPow2)
+					{
+						const int idx = distance2 * idxFactor;
+						rho += poly6LookupTable[idx];
+					}
 				}
 			}
 		}
