@@ -19,12 +19,12 @@
 
 using namespace glm;
 
-#define PARTICLE_COUNT 10000
+#define PARTICLE_COUNT 30000
 #define SCRWIDTH 1024
 #define SCRHEIGHT 768
 #define DRAW_MESH 1
 
-static bool firstMouse = false;
+static bool firstMouse = false, drawMesh = true;
 static double lastMouseX, lastMouseY;
 
 inline void CheckGL(int line)
@@ -121,7 +121,6 @@ int main(int argc, char *argv[])
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-#if !DRAW_MESH
 	std::string warn, err;
 	tinyobj::attrib_t attrib;
 	std::vector<tinyobj::shape_t> shapes;
@@ -169,7 +168,6 @@ int main(int argc, char *argv[])
 	auto sphereVAO = VertexArray();
 	sphereVAO.assignBuffer(0, vBuffer);
 	sphereVAO.assignBuffer(1, nBuffer);
-#endif
 
 	shader.enable();
 	shader.setUniformMatrix4fv("view", glm::mat4(1.0f));
@@ -216,40 +214,43 @@ int main(int argc, char *argv[])
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 
-#if !DRAW_MESH
-		shader.enable();
-		shader.setUniformMatrix4fv("view", camera.GetViewMatrix());
-		shader.setUniformMatrix4fv("projection", camera.GetProjectionMatrix(width, height, 0.1f, 1e34f));
-		shader.setUniform1f("radius", simulationParams.particleRadius);
-		shader.setUniform3f("color", vec3(0.40f, 0.75f, 1.0f));
-
-		sphereVAO.bind();
-		for (const auto &p : particles)
+		if (drawMesh)
 		{
-			shader.setUniform1f("pressure", p.pressure);
-			shader.setUniform3f("position", p.position);
-			glDrawArrays(GL_TRIANGLES, 0, vertices.size());
+			meshShader.enable();
+			meshShader.setUniformMatrix4fv("view", camera.GetViewMatrix());
+			meshShader.setUniformMatrix4fv("projection", camera.GetProjectionMatrix(width, height, 0.1f, 1e34f));
+			meshShader.setUniform1f("radius", simulationParams.particleRadius);
+			meshShader.setUniform3f("color", vec3(0.40f, 0.75f, 1.0f));
+
+			glm::mat4 model(1.0f);
+			const float scale = 1.0f / simulator.getVoxelScale() * 2.0f;
+			const auto worldMin = simulator.getWorldMin();
+			model = glm::translate(model, {worldMin.x, 0.0f, worldMin.z});
+			model = glm::scale(model, vec3(scale));
+			meshShader.setUniformMatrix4fv("model", model);
+
+			simulator.extractSurface(meshShader);
+			meshShader.disable();
+			CHECKGL();
 		}
-		CHECKGL();
-		sphereVAO.unbind();
-#else
-		meshShader.enable();
-		meshShader.setUniformMatrix4fv("view", camera.GetViewMatrix());
-		meshShader.setUniformMatrix4fv("projection", camera.GetProjectionMatrix(width, height, 0.1f, 1e34f));
-		meshShader.setUniform1f("radius", simulationParams.particleRadius);
-		meshShader.setUniform3f("color", vec3(0.40f, 0.75f, 1.0f));
+		else
+		{
+			shader.enable();
+			shader.setUniformMatrix4fv("view", camera.GetViewMatrix());
+			shader.setUniformMatrix4fv("projection", camera.GetProjectionMatrix(width, height, 0.1f, 1e34f));
+			shader.setUniform1f("radius", simulationParams.particleRadius);
+			shader.setUniform3f("color", vec3(0.40f, 0.75f, 1.0f));
 
-		glm::mat4 model(1.0f);
-		const float scale = 1.0f / simulator.getVoxelScale() * 2.0f;
-		const auto worldMin = simulator.getWorldMin();
-		model = glm::translate(model, {worldMin.x, 0.0f, worldMin.z});
-		model = glm::scale(model, vec3(scale));
-		meshShader.setUniformMatrix4fv("model", model);
-
-		simulator.extractSurface(meshShader);
-		meshShader.disable();
-		CHECKGL();
-#endif
+			sphereVAO.bind();
+			for (const auto &p : particles)
+			{
+				shader.setUniform1f("pressure", p.pressure);
+				shader.setUniform3f("position", p.position);
+				glDrawArrays(GL_TRIANGLES, 0, vertices.size());
+			}
+			CHECKGL();
+			sphereVAO.unbind();
+		}
 
 		planeShader.enable();
 		planeShader.setUniformMatrix4fv("view", camera.GetViewMatrix());
@@ -295,6 +296,7 @@ int main(int argc, char *argv[])
 
 		ImGui::Begin("Params");
 		ImGui::Text("Running: %i", runSim);
+		ImGui::Checkbox("Render Surface", &drawMesh);
 		ImGui::DragFloat("Mass", &simulationParams.particleMass);
 		ImGui::DragFloat("Radius", &simulationParams.particleRadius, 0.005f, 0.7f, 10.0f);
 		ImGui::DragFloat("Drag", &simulationParams.particleDrag, 0.005f, 0.0f, 10.0f);
