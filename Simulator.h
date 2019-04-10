@@ -24,7 +24,7 @@ template <>
 inline PolyVox::DefaultMarchingCubesController<float>::DensityType
 PolyVox::DefaultMarchingCubesController<float>::getThreshold()
 {
-	return .7f;
+	return .25f;
 }
 
 using namespace glm;
@@ -156,7 +156,7 @@ class Simulator
 	void fillVoxelVolume();
 
   private:
-	static constexpr int gridDimX = 25, gridDimY = 15, gridDimZ = 25;
+	static constexpr int gridDimX = 50, gridDimY = 28, gridDimZ = 50;
 
 	std::vector<Plane> m_Collider = {};
 	std::vector<Particle> m_Particles = {};
@@ -182,5 +182,4 @@ class Simulator
 	bool firstLaunch = true;
 	const float voxelResScale = 2.0f;
 
-	std::vector<float> poly6LookupTable{};
 };

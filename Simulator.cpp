@@ -7,9 +7,9 @@ constexpr float PI = float(M_PI);
 
 using namespace PolyVox;
 
-inline float poly6(const float rSqLen, float h)
+inline float poly6(const float squaredLength, float rad_influence)
 {
-	return 315.f / (64.f * glm::pi<float>() * powf(h, 9.0f)) * powf(max(0.0f, h * h - rSqLen), 3.f);
+	return 315.0f / (64.0f * glm::pi<float>() * powf(rad_influence, 9.0f)) * powf(max(0.0f, rad_influence * rad_influence - squaredLength), 3.f);
 }
 
 // Get the position in a grid of a particle. Returns {grid.x,grid.y,grid.z} vector of indices
@@ -96,13 +96,6 @@ void Simulator::setParticleGridBounds(glm::vec3 minPoint, glm::vec3 maxPoint)
 	const vec3 bucketSize = {(worldMax.x - worldMin.x) / float(gridDimX), (worldMax.y - worldMin.y) / float(gridDimY),
 							 (worldMax.z - worldMin.z) / float(gridDimZ)};
 	const float maxLength = glm::max(bucketSize.x, glm::max(bucketSize.y, bucketSize.z));
-
-	const float factor = 1.0f / 1024.0f;
-	for (int i = 0; i < 1024; i++)
-	{
-		const float distance2 = float(i) * factor;
-		poly6LookupTable.push_back(poly6(distance2, m_Params[0].particleRadius));
-	}
 }
 
 void Simulator::addParticles(size_t N, size_t parameterID)
@@ -555,7 +548,6 @@ float Simulator::calculateDensity(const vec3 &pos)
 
 	float rho = 0.0f;
 	const float &mass = m_Params[0].particleMass;
-	const float idxFactor = 1.0f / float(poly6LookupTable.size());
 
 #pragma omp parallel for
 	for (int i = begin.x; i <= end.x; ++i)
@@ -572,13 +564,13 @@ float Simulator::calculateDensity(const vec3 &pos)
 					const float distance2 = dot(posDiff, posDiff);
 					if (distance2 < m_Params[0].particleRadiusPow2)
 					{
-						const int idx = distance2 * idxFactor;
-						rho += poly6LookupTable[idx];
+						//TODO(Dan): Optimize this
+						rho += poly6(distance2, m_Params[0].smoothingRadius);
 					}
 				}
 			}
 		}
 	}
 
-	return rho * mass;
+	return mass * rho;
 }

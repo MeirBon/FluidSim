@@ -74,19 +74,19 @@ int main(int argc, char *argv[])
 
 	// Left plane
 	simulator.addPlane(
-		Plane(vec3(-20.0f, 7.5f, 0.0f), vec3(0.0f, 0.0f, 1.0f), vec3(0.0f, 1.0f, 0.0f), vec2(20.0f, 7.5f)));
+		Plane(vec3(-20.0f, 15.0f, 0.0f), vec3(0.0f, 0.0f, 1.0f), vec3(0.0f, 1.0f, 0.0f), vec2(20.0f, 15.0f)));
 
 	// Right plane
 	simulator.addPlane(
-		Plane(vec3(20.0f, 7.5f, 0.0f), vec3(0.0f, 0.0f, -1.0f), vec3(0.0f, 1.0f, 0.0f), vec2(20.0f, 7.5f)));
+		Plane(vec3(20.0f, 15.0f, 0.0f), vec3(0.0f, 0.0f, -1.0f), vec3(0.0f, 1.0f, 0.0f), vec2(20.0f, 15.0f)));
 
 	// Far Plane
 	simulator.addPlane(
-		Plane(vec3(0.0f, 7.5f, -20.0f), vec3(-1.0f, 0.0f, 0.0f), vec3(0.0f, 1.0f, 0.0f), vec2(20.0f, 7.5f)));
+		Plane(vec3(0.0f, 15.0f, -20.0f), vec3(-1.0f, 0.0f, 0.0f), vec3(0.0f, 1.0f, 0.0f), vec2(20.0f, 15.0f)));
 
 	// Near plane
 	simulator.addPlane(
-		Plane(vec3(0.0f, 7.5f, 20.0f), vec3(1.0f, 0.0f, 0.0f), vec3(0.0f, 1.0f, 0.0f), vec2(20.0f, 7.5f)));
+		Plane(vec3(0.0f, 15.0f, 20.0f), vec3(1.0f, 0.0f, 0.0f), vec3(0.0f, 1.0f, 0.0f), vec2(20.0f, 15.0f)));
 
 	// Get world bounds
 	// Effectively compute AABB of the world bound matrices.
@@ -297,7 +297,7 @@ int main(int argc, char *argv[])
 		ImGui::Begin("Params");
 		ImGui::Text("Running: %i", runSim);
 		ImGui::Checkbox("Render Surface", &drawMesh);
-		ImGui::DragFloat("Mass", &simulationParams.particleMass);
+		ImGui::DragFloat("Mass", &simulationParams.particleMass,0.05,0.05,1);
 		ImGui::DragFloat("Radius", &simulationParams.particleRadius, 0.005f, 0.7f, 10.0f);
 		ImGui::DragFloat("Drag", &simulationParams.particleDrag, 0.005f, 0.0f, 10.0f);
 		ImGui::DragFloat("Viscosity", &simulationParams.particleViscosity, 0.005f, 0.0f, 10.0f);
