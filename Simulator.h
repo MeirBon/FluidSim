@@ -170,6 +170,7 @@ class Simulator
 	vec3 worldMin{INFINITY, INFINITY, INFINITY};
 	vec3 worldMax{-INFINITY, -INFINITY, -INFINITY};
 	vec3 worldLengths{};
+	vec3 trans = vec3(0.0f);
 
 	vec3 m_Delta;
 	int m_RowSize;

@@ -117,7 +117,8 @@ void Simulator::setParticleGridBounds()
 	}
 	voxelVolume = new SimpleVolume<float>({min, max});
 
-	if (surfaceExtractor != nullptr){
+	if (surfaceExtractor != nullptr)
+	{
 		delete surfaceExtractor;
 		surfaceExtractor = nullptr;
 	}
@@ -498,7 +499,7 @@ vec3 Simulator::voxelIndexToWorldPos(int voxelX, int voxelY, int voxelZ) const
 	const float x = float(voxelX) / voxelResScale;
 	const float y = float(voxelY) / voxelResScale;
 	const float z = float(voxelZ) / voxelResScale;
-	return {x, y, z};
+	return trans + vec3(x, y, z);
 }
 
 void Simulator::fillVoxelVolume()
@@ -524,6 +525,7 @@ void Simulator::fillVoxelVolume()
 
 void Simulator::moveBounds(glm::vec3 translation)
 {
+	trans += translation;
 	for (auto &plane : getPlanes())
 		plane.translate(translation);
 
@@ -539,6 +541,7 @@ void Simulator::extractSurface(Shader &shader)
 	const auto &lowerCorner = voxelRegion.getLowerCorner();
 	const auto &upperCorner = voxelRegion.getUpperCorner();
 
+	surfaceMesh.translateVertices({trans.x, trans.y, trans.z});
 	const std::vector<PositionMaterialNormal> &waterMeshVerts = surfaceMesh.getVertices();
 	const std::vector<uint32_t> &waterMeshIndices = surfaceMesh.getIndices();
 
