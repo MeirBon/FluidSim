@@ -59,8 +59,10 @@ if (NOT WIN32)
     find_package(GLM REQUIRED)
     find_package(GLEW REQUIRED)
 
+    link_directories("lib/Unix")
+
     target_link_libraries(${PROJECT_NAME} PRIVATE ${GLFW_LIBRARY} GLEW::GLEW)
-    target_link_libraries(${PROJECT_NAME} PRIVATE ${GLFW_LIBRARY} PolyVoxCore PolyVoxUtil)
+    target_link_libraries(${PROJECT_NAME} PRIVATE "${CMAKE_SOURCE_DIR}/lib/Unix/libPolyVoxCore.a" "${CMAKE_SOURCE_DIR}/lib/Unix/libPolyVoxUtil.a")
 else ()
     if (CMAKE_SIZEOF_VOID_P EQUAL 8)
         set(LIB_DIR "x64")
