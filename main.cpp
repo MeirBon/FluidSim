@@ -258,13 +258,13 @@ int main(int argc, char *argv[])
 		if (keys[GLFW_KEY_LEFT_CONTROL])
 			camera.ProcessKeyboard(DOWN, elapsed);
 		if (keys[GLFW_KEY_UP])
-			simulator.moveBounds(glm::vec3(0,0.10,0));
+			simulator.moveBounds(glm::vec3(0, 0.10, 0));
 		if (keys[GLFW_KEY_DOWN])
-			simulator.moveBounds(glm::vec3(0,-0.10,0));
+			simulator.moveBounds(glm::vec3(0, -0.10, 0));
 		if (keys[GLFW_KEY_LEFT])
-			simulator.moveBounds(glm::vec3(-0.1,0,0));
+			simulator.moveBounds(glm::vec3(-0.1, 0, 0));
 		if (keys[GLFW_KEY_RIGHT])
-			simulator.moveBounds(glm::vec3(0.1,0,0));
+			simulator.moveBounds(glm::vec3(0.1, 0, 0));
 		if (keys[GLFW_KEY_R] && elapsedSum > 200.0f)
 			runSim = !runSim, elapsedSum = 0.0f;
 		if (keys[GLFW_KEY_BACKSPACE] && elapsedSum > 200.0f)
@@ -273,7 +273,7 @@ int main(int argc, char *argv[])
 		ImGui::Begin("Params");
 		ImGui::Text("Running: %i", runSim);
 		ImGui::Checkbox("Render Surface", &drawMesh);
-		ImGui::DragFloat("Mass", &simulationParams.particleMass,0.05,0.05,1);
+		ImGui::DragFloat("Mass", &simulationParams.particleMass, 0.05, 0.05, 1);
 		ImGui::DragFloat("Radius", &simulationParams.particleRadius, 0.005f, 0.7f, 10.0f);
 		ImGui::DragFloat("Drag", &simulationParams.particleDrag, 0.005f, 0.0f, 10.0f);
 		ImGui::DragFloat("Viscosity", &simulationParams.particleViscosity, 0.005f, 0.0f, 10.0f);

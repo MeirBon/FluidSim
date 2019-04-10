@@ -525,7 +525,7 @@ void Simulator::fillVoxelVolume()
 void Simulator::moveBounds(glm::vec3 translation)
 {
 	for (auto &plane : getPlanes())
-		plane.position += translation;
+		plane.translate(translation);
 
 	setParticleGridBounds();
 }
@@ -541,8 +541,6 @@ void Simulator::extractSurface(Shader &shader)
 
 	const std::vector<PositionMaterialNormal> &waterMeshVerts = surfaceMesh.getVertices();
 	const std::vector<uint32_t> &waterMeshIndices = surfaceMesh.getIndices();
-
-	// std::cout << waterMeshVerts.size() << std::endl;
 
 	const vec3 correction = vec3(2.0f, 3.0f / 2.0f, 2.0f);
 	shader.setUniform3f("correction", correction);

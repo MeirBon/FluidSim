@@ -10,12 +10,12 @@ Plane::Plane(vec3 pos, vec3 r, vec3 f, vec2 dims) : position(pos), right(r), for
 	const vec3 offsetForward = f * dims.y;
 	const vec3 normal = glm::normalize(glm::cross(r, f));
 
-	vertices.push_back(pos - offsetRight - offsetForward);
-	vertices.push_back(pos + offsetRight - offsetForward);
-	vertices.push_back(pos - offsetRight + offsetForward);
-	vertices.push_back(pos + offsetRight - offsetForward);
-	vertices.push_back(pos - offsetRight + offsetForward);
-	vertices.push_back(pos + offsetRight + offsetForward);
+	vertices.push_back(vec3(0.0f) - offsetRight - offsetForward);
+	vertices.push_back(vec3(0.0f) + offsetRight - offsetForward);
+	vertices.push_back(vec3(0.0f) - offsetRight + offsetForward);
+	vertices.push_back(vec3(0.0f) + offsetRight - offsetForward);
+	vertices.push_back(vec3(0.0f) - offsetRight + offsetForward);
+	vertices.push_back(vec3(0.0f) + offsetRight + offsetForward);
 
 	for (int i = 0; i < 6; i++)
 		normals.push_back(normal);
@@ -48,8 +48,11 @@ void Plane::draw(Shader &shader) const
 {
 	shader.enable();
 	shader.setUniform3f("color", vec3(0.9f));
+	shader.setUniform3f("translation", position);
 	glBindVertexArray(VAO);
 	glDrawArrays(GL_TRIANGLES, 0, 6);
 	glBindVertexArray(0);
 	shader.disable();
 }
+
+void Plane::translate(const vec3 &pos) { position += pos; }
