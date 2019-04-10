@@ -1,0 +1,3 @@
+[submodule "deps/MeshReconstruction"]
+	path = deps/MeshReconstruction
+	url = https://github.com/Magnus2/MeshReconstruction.git

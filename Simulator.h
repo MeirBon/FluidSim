@@ -1,17 +1,31 @@
 #pragma once
 
+#include "Buffer.h"
 #include "Particle.h"
 #include "Plane.h"
+#include "VertexArray.h"
+
 #include <cmath>
 #include <glm/glm.hpp>
 #include <random>
 #include <vector>
+
+#include <PolyVoxCore/MarchingCubesSurfaceExtractor.h>
+#include <PolyVoxCore/SimpleVolume.h>
+#include <PolyVoxCore/SurfaceMesh.h>
 
 #include "ctpl_stl.h"
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
 #endif
+
+template <>
+inline PolyVox::DefaultMarchingCubesController<float>::DensityType
+PolyVox::DefaultMarchingCubesController<float>::getThreshold()
+{
+	return .25f;
+}
 
 using namespace glm;
 
@@ -29,14 +43,11 @@ inline float randFloat()
 
 struct SimulationParams
 {
+	friend class Simulator;
 	// Particle size
 	float particleRadius;
 	// Radius of influence - from SPH paper
 	float smoothingRadius;
-	// Radius of influence squared. Kept for optimization purposes.
-	float smoothingRadiusPow2;
-	// Radius of influence to the power of 9. Kept for optimization purposes.
-	float smoothingRadiusPow9;
 	float restDensity;
 	float gravityMult;
 
@@ -53,13 +64,23 @@ struct SimulationParams
 	{
 		particleRadius = pRadius;
 		smoothingRadius = sRadius;
-		smoothingRadiusPow2 = sRadius * sRadius;
+
+		smoothingRadiusPow2 = powf(sRadius, 2.0f);
+		smoothingRadiusPow6 = powf(sRadius, 6.0f);
+		smoothingRadiusPow9 = powf(sRadius, 9.0f);
+
 		restDensity = restDens;
 		gravityMult = gravMult;
 		particleMass = pMass;
 		particleViscosity = pVisc;
 		particleDrag = pDrag;
 	}
+
+	// Optimization variables
+	float particleRadiusPow2;
+	float smoothingRadiusPow2;
+	float smoothingRadiusPow6;
+	float smoothingRadiusPow9;
 };
 
 class Simulator
@@ -81,16 +102,20 @@ class Simulator
 
 	inline std::vector<SimulationParams> &getSimParams() { return m_Params; }
 
-	inline const std::vector<Plane> &getPlanes() const { return m_Collider; }
+	inline std::vector<Plane> &getPlanes() { return m_Collider; }
 
 	inline void update(float timestep)
 	{
 		// Update every frame to accomodate for possible changing values.
-		for (auto& params : m_Params)
+		for (auto &params : m_Params)
 		{
+			params.particleRadiusPow2 = params.particleRadius * params.particleRadius;
 			params.smoothingRadiusPow2 = params.smoothingRadius * params.smoothingRadius;
+			params.smoothingRadiusPow6 =
+				params.smoothingRadiusPow2 * params.smoothingRadiusPow2 * params.smoothingRadiusPow2;
 			params.smoothingRadiusPow9 = params.smoothingRadiusPow2 * params.smoothingRadiusPow2 *
-										 params.smoothingRadiusPow2 * params.smoothingRadiusPow2 * params.smoothingRadius;
+										 params.smoothingRadiusPow2 * params.smoothingRadiusPow2 *
+										 params.smoothingRadius;
 		}
 
 		buildGrid();
@@ -102,7 +127,17 @@ class Simulator
 
 	void reset();
 
-	void setParticleGridBounds(glm::vec3 minPoint, glm::vec3 maxPoint);
+	void setParticleGridBounds();
+
+	void moveBounds(glm::vec3 translation);
+
+	float calculateDensity(const vec3 &pos);
+
+	void extractSurface(Shader &shader);
+
+	inline const vec3 &getWorldMin() const { return worldMin; }
+
+	inline float getVoxelScale() { return voxelResScale; }
 
   private:
 	static bool intersect(const Plane &collider, const vec3 &position, float radius, vec3 &penetrationNormal,
@@ -114,12 +149,17 @@ class Simulator
 
 	void computeDensityPressure();
 	void computeForces();
-
 	void buildGrid();
+
 	i32vec3 getParticleGridPosition(glm::vec3 position);
 
+	vec3 voxelIndexToWorldPos(int voxelX, int voxelY, int voxelZ) const;
+
+	void fillVoxelVolume();
+
+
   private:
-	static constexpr int gridDimX = 25, gridDimY = 15, gridDimZ = 25;
+	static constexpr int gridDimX = 50, gridDimY = 28, gridDimZ = 50;
 
 	std::vector<Plane> m_Collider = {};
 	std::vector<Particle> m_Particles = {};
@@ -129,10 +169,21 @@ class Simulator
 	// Effectively AABB of grid
 	vec3 worldMin{INFINITY, INFINITY, INFINITY};
 	vec3 worldMax{-INFINITY, -INFINITY, -INFINITY};
+	vec3 worldLengths{};
+	vec3 trans = vec3(0.0f);
 
 	vec3 m_Delta;
 	int m_RowSize;
 	ctpl::thread_pool *m_Pool;
 	int m_ThreadCount = std::thread::hardware_concurrency();
 	std::vector<std::future<void>> m_Jobs;
+
+	PolyVox::SimpleVolume<float> *voxelVolume = nullptr;
+	PolyVox::SurfaceMesh<PolyVox::PositionMaterialNormal> surfaceMesh;
+	PolyVox::MarchingCubesSurfaceExtractor<PolyVox::SimpleVolume<float>> *surfaceExtractor = nullptr;
+
+	GLuint fluidVBO, fluidEBO, VAO;
+	bool firstLaunch = true;
+	const float voxelResScale = 2.0f;
+
 };

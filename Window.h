@@ -8,6 +8,8 @@
 #include <ImGuiGLFW.h>
 #include <ImGuiOpenGL3.h>
 
+#include <functional>
+
 class Window
 {
   public:
@@ -19,13 +21,18 @@ class Window
 	void present();
 	void setTitle(const char *title);
 	void close();
+
+	void setMouseCallback(std::function<void(double, double)> callback);
+	void setResizeCallback(std::function<void(int, int)> callback);
 	std::pair<int, int> getSize();
 
+  public:
 	bool *keys;
-
-  private:
 	GLFWwindow *m_Window;
 	ImGuiContext *m_Context;
+
+	std::function<void(double, double)> onMouseMove = [](double, double) {};
+	std::function<void(int, int)> onResize = [](int, int) {};
 };
 
 static Window *instance = nullptr;
@@ -36,6 +43,20 @@ void handle_keys(GLFWwindow *window, int key, int scancode, int action, int mods
 		instance->keys[key] = true;
 	else if (action == GLFW_RELEASE)
 		instance->keys[key] = false;
+}
+
+void mouse_button_callback(GLFWwindow *window, int button, int action, int mods)
+{
+	if (action == GLFW_PRESS)
+		instance->keys[button] = true;
+	else if (action == GLFW_RELEASE)
+		instance->keys[button] = false;
+}
+
+void window_size_callback(GLFWwindow *window, int width, int height)
+{
+	instance->onResize(width, height);
+	glViewport(0, 0, width, height);
 }
 
 Window::Window(const char *title, int width, int height)
@@ -62,6 +83,17 @@ Window::Window(const char *title, int width, int height)
 	glfwMakeContextCurrent(m_Window);
 	glfwSetInputMode(m_Window, GLFW_CURSOR, GLFW_CURSOR_HIDDEN);
 	glfwSetKeyCallback(m_Window, handle_keys);
+	glfwSetMouseButtonCallback(m_Window, mouse_button_callback);
+	glfwSetWindowSizeCallback(m_Window, window_size_callback);
+	glfwSetCursorPosCallback(m_Window, [](auto *window, auto x, auto y) {
+		static bool first = true;
+		static double lastX, lastY;
+		if (first)
+			first = false, lastX = x, lastY = y;
+
+		instance->onMouseMove(x - lastX, y - lastY);
+		lastX = x, lastY = y;
+	});
 
 	if (glewInit() != GL_NO_ERROR)
 		std::cout << "Could not init GLEW." << std::endl, exit(1);
@@ -106,6 +138,10 @@ void Window::present()
 }
 void Window::setTitle(const char *title) { glfwSetWindowTitle(m_Window, title); }
 void Window::close() { glfwSetWindowShouldClose(m_Window, 1); }
+
+inline void Window::setMouseCallback(std::function<void(double, double)> callback) { onMouseMove = callback; }
+
+inline void Window::setResizeCallback(std::function<void(int, int)> callback) { onResize = callback; }
 
 std::pair<int, int> Window::getSize()
 {

@@ -21,4 +21,5 @@ struct Plane
 
 	explicit Plane(vec3 pos, vec3 r, vec3 f, vec2 dims);
 	void draw(Shader &shader) const;
+	void translate(const vec3 &pos);
 };

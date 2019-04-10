@@ -19,9 +19,13 @@
 
 using namespace glm;
 
-#define PARTICLE_COUNT 10000
+#define PARTICLE_COUNT 30000
 #define SCRWIDTH 1024
 #define SCRHEIGHT 768
+#define DRAW_MESH 1
+
+static bool firstMouse = false, drawMesh = false;
+static double lastMouseX, lastMouseY;
 
 inline void CheckGL(int line)
 {
@@ -34,15 +38,20 @@ inline void CheckGL(int line)
 
 // TODO(Dan): Temporarily moved this as a global variable because grid array is to big to fit on stack.
 Simulator simulator(16, vec3(-6.0f, 0.0f, 0.0f));
+static Camera camera = Camera(vec3(0.0f, 25.0f, 30.0f));
+static Window window = Window("FluidSim", SCRWIDTH, SCRHEIGHT);
 
 int main(int argc, char *argv[])
 {
 	Timer timer{};
-	auto window = Window("FluidSim", SCRWIDTH, SCRHEIGHT);
-	Camera camera = Camera(vec3(0.0f, 25.0f, 30.0f));
+	window.setMouseCallback([](double x, double y) {
+		if (window.keys[GLFW_MOUSE_BUTTON_RIGHT])
+			camera.ProcessMouseMovement(float(x), -float(y));
+	});
 
 	bool runSim = false;
 	auto shader = Shader("shaders/sphere.vert", "shaders/sphere.frag");
+	auto meshShader = Shader("shaders/mesh.vert", "shaders/mesh.frag");
 	auto planeShader = Shader("shaders/plane.vert", "shaders/plane.frag");
 
 	SimulationParams params{};
@@ -65,45 +74,21 @@ int main(int argc, char *argv[])
 
 	// Left plane
 	simulator.addPlane(
-		Plane(vec3(-20.0f, 7.5f, 0.0f), vec3(0.0f, 0.0f, 1.0f), vec3(0.0f, 1.0f, 0.0f), vec2(20.0f, 7.5f)));
+		Plane(vec3(-20.0f, 15.0f, 0.0f), vec3(0.0f, 0.0f, 1.0f), vec3(0.0f, 1.0f, 0.0f), vec2(20.0f, 15.0f)));
 
 	// Right plane
 	simulator.addPlane(
-		Plane(vec3(20.0f, 7.5f, 0.0f), vec3(0.0f, 0.0f, -1.0f), vec3(0.0f, 1.0f, 0.0f), vec2(20.0f, 7.5f)));
+		Plane(vec3(20.0f, 15.0f, 0.0f), vec3(0.0f, 0.0f, -1.0f), vec3(0.0f, 1.0f, 0.0f), vec2(20.0f, 15.0f)));
 
 	// Far Plane
 	simulator.addPlane(
-		Plane(vec3(0.0f, 7.5f, -20.0f), vec3(-1.0f, 0.0f, 0.0f), vec3(0.0f, 1.0f, 0.0f), vec2(20.0f, 7.5f)));
+		Plane(vec3(0.0f, 15.0f, -20.0f), vec3(-1.0f, 0.0f, 0.0f), vec3(0.0f, 1.0f, 0.0f), vec2(20.0f, 15.0f)));
 
 	// Near plane
 	simulator.addPlane(
-		Plane(vec3(0.0f, 7.5f, 20.0f), vec3(1.0f, 0.0f, 0.0f), vec3(0.0f, 1.0f, 0.0f), vec2(20.0f, 7.5f)));
+		Plane(vec3(0.0f, 15.0f, 20.0f), vec3(1.0f, 0.0f, 0.0f), vec3(0.0f, 1.0f, 0.0f), vec2(20.0f, 15.0f)));
 
-	// Get world bounds
-	// Effectively compute AABB of the world bound matrices.
-	// Easily moveable to a function if we define planes as moveable
-	vec3 minPoint{INFINITY, INFINITY, INFINITY};
-	vec3 maxPoint{-INFINITY, -INFINITY, -INFINITY};
-
-	for (const auto &plane : simulator.getPlanes())
-	{
-		vec3 edgePoint1 = plane.position + plane.right * plane.size.x;
-		vec3 edgePoint2 = plane.position - plane.right * plane.size.x;
-
-		vec3 edgePoint3 = plane.position + plane.forward * plane.size.y;
-		vec3 edgePoint4 = plane.position - plane.forward * plane.size.y;
-
-		minPoint = glm::min(minPoint, edgePoint1);
-		minPoint = glm::min(minPoint, edgePoint2);
-		minPoint = glm::min(minPoint, edgePoint3);
-		minPoint = glm::min(minPoint, edgePoint4);
-
-		maxPoint = glm::max(maxPoint, edgePoint1);
-		maxPoint = glm::max(maxPoint, edgePoint2);
-		maxPoint = glm::max(maxPoint, edgePoint3);
-		maxPoint = glm::max(maxPoint, edgePoint4);
-	}
-	simulator.setParticleGridBounds(minPoint, maxPoint);
+	simulator.setParticleGridBounds();
 
 	const auto &particles = simulator.getParticles();
 
@@ -169,6 +154,15 @@ int main(int argc, char *argv[])
 	shader.setUniform3f("ambient", vec3(0.1f));
 	shader.disable();
 
+	meshShader.enable();
+	meshShader.setUniformMatrix4fv("view", glm::mat4(1.0f));
+	meshShader.setUniformMatrix4fv("projection", glm::mat4(1.0f));
+	meshShader.setUniformMatrix4fv("model", glm::mat4(1.0f));
+	meshShader.setUniform3f("lightIntensity", vec3(1.0f));
+	meshShader.setUniform3f("lightDirection", glm::normalize(vec3(-1.0f, 1.0f, 0.0f)));
+	meshShader.setUniform3f("ambient", vec3(0.1f));
+	meshShader.disable();
+
 	planeShader.enable();
 	planeShader.setUniformMatrix4fv("view", glm::mat4(1.0f));
 	planeShader.setUniformMatrix4fv("projection", glm::mat4(1.0f));
@@ -179,10 +173,16 @@ int main(int argc, char *argv[])
 	planeShader.disable();
 
 	timer.reset();
-	// TODO(Dan): Not obvious what elapsedSum does
+	// TODO(Dan): Not obvious what elapsedSum does (Meir): It's used when a button is pressed, makes sure you don't keep
+	// switching toggles
 	float elapsed = 0.1f, elapsedSum = 0.0f;
+	simulator.update(0.0f);
 	while (!window.shouldClose())
 	{
+		const auto size = window.getSize();
+		const int width = std::get<0>(size);
+		const int height = std::get<1>(size);
+
 		elapsedSum += elapsed;
 		if (runSim)
 			simulator.update(elapsed);
@@ -190,25 +190,47 @@ int main(int argc, char *argv[])
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 
-		shader.enable();
-		shader.setUniformMatrix4fv("view", camera.GetViewMatrix());
-		shader.setUniformMatrix4fv("projection", camera.GetProjectionMatrix(SCRWIDTH, SCRHEIGHT, 0.1f, 1e34f));
-		shader.setUniform1f("radius", simulationParams.particleRadius);
-		shader.setUniform3f("color", vec3(0.40f, 0.75f, 1.0f));
-
-		sphereVAO.bind();
-		for (const auto &p : particles)
+		if (drawMesh)
 		{
-			shader.setUniform1f("pressure", p.pressure);
-			shader.setUniform3f("position", p.position);
-			glDrawArrays(GL_TRIANGLES, 0, vertices.size());
+			meshShader.enable();
+			meshShader.setUniformMatrix4fv("view", camera.GetViewMatrix());
+			meshShader.setUniformMatrix4fv("projection", camera.GetProjectionMatrix(width, height, 0.1f, 1e34f));
+			meshShader.setUniform1f("radius", simulationParams.particleRadius);
+			meshShader.setUniform3f("color", vec3(0.40f, 0.75f, 1.0f));
+
+			glm::mat4 model(1.0f);
+			const float scale = 1.0f / simulator.getVoxelScale() * 2.0f;
+			const auto worldMin = simulator.getWorldMin();
+			model = glm::translate(model, {worldMin.x, 0.0f, worldMin.z});
+			model = glm::scale(model, vec3(scale));
+			meshShader.setUniformMatrix4fv("model", model);
+
+			simulator.extractSurface(meshShader);
+			meshShader.disable();
+			CHECKGL();
 		}
-		CHECKGL();
-		sphereVAO.unbind();
+		else
+		{
+			shader.enable();
+			shader.setUniformMatrix4fv("view", camera.GetViewMatrix());
+			shader.setUniformMatrix4fv("projection", camera.GetProjectionMatrix(width, height, 0.1f, 1e34f));
+			shader.setUniform1f("radius", simulationParams.particleRadius);
+			shader.setUniform3f("color", vec3(0.40f, 0.75f, 1.0f));
+
+			sphereVAO.bind();
+			for (const auto &p : particles)
+			{
+				shader.setUniform1f("pressure", p.pressure);
+				shader.setUniform3f("position", p.position);
+				glDrawArrays(GL_TRIANGLES, 0, vertices.size());
+			}
+			CHECKGL();
+			sphereVAO.unbind();
+		}
 
 		planeShader.enable();
 		planeShader.setUniformMatrix4fv("view", camera.GetViewMatrix());
-		planeShader.setUniformMatrix4fv("projection", camera.GetProjectionMatrix(SCRWIDTH, SCRHEIGHT, 0.1f, 1e34f));
+		planeShader.setUniformMatrix4fv("projection", camera.GetProjectionMatrix(width, height, 0.1f, 1e34f));
 
 		for (const auto &plane : simulator.getPlanes())
 		{
@@ -218,6 +240,7 @@ int main(int argc, char *argv[])
 
 		const auto *keys = window.keys;
 
+		elapsed *= 3.0f;
 		if (keys[GLFW_KEY_LEFT_SHIFT])
 			elapsed *= 5.0f;
 		if (keys[GLFW_KEY_Q] || keys[GLFW_KEY_ESCAPE])
@@ -235,25 +258,25 @@ int main(int argc, char *argv[])
 		if (keys[GLFW_KEY_LEFT_CONTROL])
 			camera.ProcessKeyboard(DOWN, elapsed);
 		if (keys[GLFW_KEY_UP])
-			camera.ProcessMouseMovement(0.0f, 3.0f);
+			simulator.moveBounds(glm::vec3(0, 0.10, 0));
 		if (keys[GLFW_KEY_DOWN])
-			camera.ProcessMouseMovement(0.0f, -3.0f);
+			simulator.moveBounds(glm::vec3(0, -0.10, 0));
 		if (keys[GLFW_KEY_LEFT])
-			camera.ProcessMouseMovement(-3.0f, 0.0f);
+			simulator.moveBounds(glm::vec3(-0.1, 0, 0));
 		if (keys[GLFW_KEY_RIGHT])
-			camera.ProcessMouseMovement(3.0f, 0.0f);
+			simulator.moveBounds(glm::vec3(0.1, 0, 0));
 		if (keys[GLFW_KEY_R] && elapsedSum > 200.0f)
 			runSim = !runSim, elapsedSum = 0.0f;
 		if (keys[GLFW_KEY_BACKSPACE] && elapsedSum > 200.0f)
 			simulator.reset(), elapsedSum = 0.0f;
 
 		ImGui::Begin("Params");
-
-		ImGui::DragFloat("Mass", &simulationParams.particleMass);
+		ImGui::Text("Running: %i", runSim);
+		ImGui::Checkbox("Render Surface", &drawMesh);
+		ImGui::DragFloat("Mass", &simulationParams.particleMass,0.05,0.05,1);
 		ImGui::DragFloat("Radius", &simulationParams.particleRadius, 0.005f, 0.7f, 10.0f);
-		ImGui::DragFloat("Drag", &simulationParams.particleDrag, 0.005f, 0.0f, 10.0f);
+		ImGui::DragFloat("Collision Drag", &simulationParams.particleDrag, 0.005f, 0.0f, 1.0f);
 		ImGui::DragFloat("Viscosity", &simulationParams.particleViscosity, 0.005f, 0.0f, 10.0f);
-		ImGui::DragFloat("Smoothing Radius", &simulationParams.smoothingRadius, 0.005f, 0.0f, 10.0f);
 		ImGui::DragFloat("Gravity", &simulationParams.gravity.y, 0.01f, 0.0f, 100.0f);
 		if (ImGui::Button("reset"))
 			simulationParams = params, simulator.reset();
