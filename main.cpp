@@ -20,8 +20,8 @@
 using namespace glm;
 
 #define PARTICLE_COUNT 30000
-#define SCRWIDTH 1024
-#define SCRHEIGHT 768
+#define SCRWIDTH 1280 
+#define SCRHEIGHT 1024 
 #define DRAW_MESH 1
 
 static bool firstMouse = false, drawMesh = false;
