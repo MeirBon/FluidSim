@@ -273,11 +273,10 @@ int main(int argc, char *argv[])
 		ImGui::Begin("Params");
 		ImGui::Text("Running: %i", runSim);
 		ImGui::Checkbox("Render Surface", &drawMesh);
-		ImGui::DragFloat("Mass", &simulationParams.particleMass, 0.05, 0.05, 1);
+		ImGui::DragFloat("Mass", &simulationParams.particleMass,0.05,0.05,1);
 		ImGui::DragFloat("Radius", &simulationParams.particleRadius, 0.005f, 0.7f, 10.0f);
-		ImGui::DragFloat("Drag", &simulationParams.particleDrag, 0.005f, 0.0f, 10.0f);
+		ImGui::DragFloat("Collision Drag", &simulationParams.particleDrag, 0.005f, 0.0f, 1.0f);
 		ImGui::DragFloat("Viscosity", &simulationParams.particleViscosity, 0.005f, 0.0f, 10.0f);
-		ImGui::DragFloat("Smoothing Radius", &simulationParams.smoothingRadius, 0.005f, 0.0f, 10.0f);
 		ImGui::DragFloat("Gravity", &simulationParams.gravity.y, 0.01f, 0.0f, 100.0f);
 		if (ImGui::Button("reset"))
 			simulationParams = params, simulator.reset();
