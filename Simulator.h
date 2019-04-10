@@ -102,7 +102,7 @@ class Simulator
 
 	inline std::vector<SimulationParams> &getSimParams() { return m_Params; }
 
-	inline const std::vector<Plane> &getPlanes() const { return m_Collider; }
+	inline std::vector<Plane> &getPlanes() { return m_Collider; }
 
 	inline void update(float timestep)
 	{
@@ -127,7 +127,9 @@ class Simulator
 
 	void reset();
 
-	void setParticleGridBounds(glm::vec3 minPoint, glm::vec3 maxPoint);
+	void setParticleGridBounds();
+
+	void moveBounds(glm::vec3 translation);
 
 	float calculateDensity(const vec3 &pos);
 
@@ -155,6 +157,7 @@ class Simulator
 
 	void fillVoxelVolume();
 
+
   private:
 	static constexpr int gridDimX = 50, gridDimY = 28, gridDimZ = 50;
 
@@ -174,9 +177,9 @@ class Simulator
 	int m_ThreadCount = std::thread::hardware_concurrency();
 	std::vector<std::future<void>> m_Jobs;
 
-	PolyVox::SimpleVolume<float> *voxelVolume;
+	PolyVox::SimpleVolume<float> *voxelVolume = nullptr;
 	PolyVox::SurfaceMesh<PolyVox::PositionMaterialNormal> surfaceMesh;
-	PolyVox::MarchingCubesSurfaceExtractor<PolyVox::SimpleVolume<float>> *surfaceExtractor;
+	PolyVox::MarchingCubesSurfaceExtractor<PolyVox::SimpleVolume<float>> *surfaceExtractor = nullptr;
 
 	GLuint fluidVBO, fluidEBO, VAO;
 	bool firstLaunch = true;

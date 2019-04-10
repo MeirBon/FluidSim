@@ -24,7 +24,7 @@ using namespace glm;
 #define SCRHEIGHT 768
 #define DRAW_MESH 1
 
-static bool firstMouse = false, drawMesh = true;
+static bool firstMouse = false, drawMesh = false;
 static double lastMouseX, lastMouseY;
 
 inline void CheckGL(int line)
@@ -88,31 +88,7 @@ int main(int argc, char *argv[])
 	simulator.addPlane(
 		Plane(vec3(0.0f, 15.0f, 20.0f), vec3(1.0f, 0.0f, 0.0f), vec3(0.0f, 1.0f, 0.0f), vec2(20.0f, 15.0f)));
 
-	// Get world bounds
-	// Effectively compute AABB of the world bound matrices.
-	// Easily moveable to a function if we define planes as moveable
-	vec3 minPoint{INFINITY, INFINITY, INFINITY};
-	vec3 maxPoint{-INFINITY, -INFINITY, -INFINITY};
-
-	for (const auto &plane : simulator.getPlanes())
-	{
-		vec3 edgePoint1 = plane.position + plane.right * plane.size.x;
-		vec3 edgePoint2 = plane.position - plane.right * plane.size.x;
-
-		vec3 edgePoint3 = plane.position + plane.forward * plane.size.y;
-		vec3 edgePoint4 = plane.position - plane.forward * plane.size.y;
-
-		minPoint = glm::min(minPoint, edgePoint1);
-		minPoint = glm::min(minPoint, edgePoint2);
-		minPoint = glm::min(minPoint, edgePoint3);
-		minPoint = glm::min(minPoint, edgePoint4);
-
-		maxPoint = glm::max(maxPoint, edgePoint1);
-		maxPoint = glm::max(maxPoint, edgePoint2);
-		maxPoint = glm::max(maxPoint, edgePoint3);
-		maxPoint = glm::max(maxPoint, edgePoint4);
-	}
-	simulator.setParticleGridBounds(minPoint, maxPoint);
+	simulator.setParticleGridBounds();
 
 	const auto &particles = simulator.getParticles();
 
@@ -282,13 +258,13 @@ int main(int argc, char *argv[])
 		if (keys[GLFW_KEY_LEFT_CONTROL])
 			camera.ProcessKeyboard(DOWN, elapsed);
 		if (keys[GLFW_KEY_UP])
-			camera.ProcessMouseMovement(0.0f, 3.0f);
+			simulator.moveBounds(glm::vec3(0,0.10,0));
 		if (keys[GLFW_KEY_DOWN])
-			camera.ProcessMouseMovement(0.0f, -3.0f);
+			simulator.moveBounds(glm::vec3(0,-0.10,0));
 		if (keys[GLFW_KEY_LEFT])
-			camera.ProcessMouseMovement(-3.0f, 0.0f);
+			simulator.moveBounds(glm::vec3(-0.1,0,0));
 		if (keys[GLFW_KEY_RIGHT])
-			camera.ProcessMouseMovement(3.0f, 0.0f);
+			simulator.moveBounds(glm::vec3(0.1,0,0));
 		if (keys[GLFW_KEY_R] && elapsedSum > 200.0f)
 			runSim = !runSim, elapsedSum = 0.0f;
 		if (keys[GLFW_KEY_BACKSPACE] && elapsedSum > 200.0f)

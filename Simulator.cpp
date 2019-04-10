@@ -9,7 +9,8 @@ using namespace PolyVox;
 
 inline float poly6(const float squaredLength, float rad_influence)
 {
-	return 315.0f / (64.0f * glm::pi<float>() * powf(rad_influence, 9.0f)) * powf(max(0.0f, rad_influence * rad_influence - squaredLength), 3.f);
+	return 315.0f / (64.0f * glm::pi<float>() * powf(rad_influence, 9.0f)) *
+		   powf(max(0.0f, rad_influence * rad_influence - squaredLength), 3.f);
 }
 
 // Get the position in a grid of a particle. Returns {grid.x,grid.y,grid.z} vector of indices
@@ -77,8 +78,29 @@ void Simulator::buildGrid()
 	}
 }
 
-void Simulator::setParticleGridBounds(glm::vec3 minPoint, glm::vec3 maxPoint)
+void Simulator::setParticleGridBounds()
 {
+	vec3 minPoint{INFINITY, INFINITY, INFINITY};
+	vec3 maxPoint{-INFINITY, -INFINITY, -INFINITY};
+
+	for (const auto &plane : getPlanes())
+	{
+		vec3 edgePoint1 = plane.position + plane.right * plane.size.x;
+		vec3 edgePoint2 = plane.position - plane.right * plane.size.x;
+
+		vec3 edgePoint3 = plane.position + plane.forward * plane.size.y;
+		vec3 edgePoint4 = plane.position - plane.forward * plane.size.y;
+
+		minPoint = glm::min(minPoint, edgePoint1);
+		minPoint = glm::min(minPoint, edgePoint2);
+		minPoint = glm::min(minPoint, edgePoint3);
+		minPoint = glm::min(minPoint, edgePoint4);
+
+		maxPoint = glm::max(maxPoint, edgePoint1);
+		maxPoint = glm::max(maxPoint, edgePoint2);
+		maxPoint = glm::max(maxPoint, edgePoint3);
+		maxPoint = glm::max(maxPoint, edgePoint4);
+	}
 	worldMin = minPoint;
 	worldMax = maxPoint;
 	worldLengths = worldMax - worldMin;
@@ -88,8 +110,17 @@ void Simulator::setParticleGridBounds(glm::vec3 minPoint, glm::vec3 maxPoint)
 	const Vector3DInt32 max = {int(worldMax.x * voxelResScale), int(worldLengths.y * voxelResScale),
 							   int(worldMax.z * voxelResScale)};
 
+	if (voxelVolume != nullptr)
+	{
+		delete voxelVolume;
+		voxelVolume = nullptr;
+	}
 	voxelVolume = new SimpleVolume<float>({min, max});
 
+	if (surfaceExtractor != nullptr){
+		delete surfaceExtractor;
+		surfaceExtractor = nullptr;
+	}
 	surfaceExtractor = new MarchingCubesSurfaceExtractor<PolyVox::SimpleVolume<float>>(
 		voxelVolume, voxelVolume->getEnclosingRegion(), &surfaceMesh);
 
@@ -491,6 +522,14 @@ void Simulator::fillVoxelVolume()
 	}
 }
 
+void Simulator::moveBounds(glm::vec3 translation)
+{
+	for (auto &plane : getPlanes())
+		plane.position += translation;
+
+	setParticleGridBounds();
+}
+
 void Simulator::extractSurface(Shader &shader)
 {
 	fillVoxelVolume();
@@ -564,7 +603,7 @@ float Simulator::calculateDensity(const vec3 &pos)
 					const float distance2 = dot(posDiff, posDiff);
 					if (distance2 < m_Params[0].particleRadiusPow2)
 					{
-						//TODO(Dan): Optimize this
+						// TODO(Dan): Optimize this
 						rho += poly6(distance2, m_Params[0].smoothingRadius);
 					}
 				}
